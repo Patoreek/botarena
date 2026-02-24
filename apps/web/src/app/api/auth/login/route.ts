@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setAuthCookie, callBackend } from "@/lib/auth/server";
+import { signOneTimeToken } from "@/lib/auth/one-time-token";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
@@ -15,20 +16,27 @@ export async function POST(request: NextRequest) {
   });
 
   const data = (await res.json().catch(() => ({}))) as {
-    user?: unknown;
+    user?: {
+      id: string;
+      email: string;
+      name?: string | null;
+      createdAt?: unknown;
+      updatedAt?: unknown;
+    };
     accessToken?: string;
     refreshToken?: string;
     error?: string;
   };
 
   if (!res.ok) {
-    return NextResponse.json(
-      { error: data.error ?? "Login failed" },
-      { status: res.status }
-    );
+    return NextResponse.json({ error: data.error ?? "Login failed" }, { status: res.status });
   }
 
-  const nextRes = NextResponse.json({ user: data.user, accessToken: data.accessToken });
+  const nextRes = NextResponse.json({
+    user: data.user,
+    accessToken: data.accessToken,
+    oneTimeToken: data.user ? await signOneTimeToken(data.user) : undefined,
+  });
   if (data.refreshToken) setAuthCookie(nextRes, data.refreshToken);
   return nextRes;
 }

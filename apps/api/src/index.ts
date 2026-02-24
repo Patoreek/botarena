@@ -18,8 +18,8 @@ async function main() {
   await fastify.register(cors, {
     origin: isDev
       ? [
-          "http://localhost:3000",
-          "http://127.0.0.1:3000",
+          // "http://localhost:3000",
+          // "http://127.0.0.1:3000",
           "http://localhost:3001",
           "http://127.0.0.1:3001",
         ]

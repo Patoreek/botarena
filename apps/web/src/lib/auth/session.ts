@@ -16,7 +16,6 @@ export async function getSession(): Promise<Session | null> {
     const refreshRes = await fetch(`${AUTH.apiUrl}/auth/refresh`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         Cookie: `${AUTH.cookieName}=${token}`,
       },
       cache: "no-store",

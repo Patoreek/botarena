@@ -66,8 +66,8 @@ pnpm db:push
 pnpm dev
 ```
 
-- **Web:** http://localhost:3000  
-- **API:** http://localhost:4000  
+- **Web:** http://localhost:3000
+- **API:** http://localhost:4000
 
 ### 6. (Optional) Prisma Studio
 
@@ -88,37 +88,37 @@ packages/
 
 ## Scripts
 
-| Command           | Description                          |
-|------------------|--------------------------------------|
-| `pnpm dev`       | Run web + API in development         |
-| `pnpm build`     | Build all apps and packages           |
-| `pnpm lint`      | Lint all workspaces                   |
-| `pnpm format`    | Format with Prettier                  |
-| `pnpm db:push`   | Push Prisma schema (no migrations)    |
-| `pnpm db:migrate`| Apply Prisma migrations              |
-| `pnpm db:studio` | Open Prisma Studio                    |
+| Command           | Description                        |
+| ----------------- | ---------------------------------- |
+| `pnpm dev`        | Run web + API in development       |
+| `pnpm build`      | Build all apps and packages        |
+| `pnpm lint`       | Lint all workspaces                |
+| `pnpm format`     | Format with Prettier               |
+| `pnpm db:push`    | Push Prisma schema (no migrations) |
+| `pnpm db:migrate` | Apply Prisma migrations            |
+| `pnpm db:studio`  | Open Prisma Studio                 |
 
 ## Environment variables
 
 ### API (`apps/api`)
 
-| Variable              | Description                    | Example                          |
-|-----------------------|--------------------------------|----------------------------------|
-| `DATABASE_URL`        | PostgreSQL connection string   | `postgresql://...@localhost:5432/botarena` |
-| `REDIS_URL`           | Redis connection string       | `redis://localhost:6379`         |
-| `JWT_SECRET`          | Secret for JWT signing        | Long random string               |
-| `JWT_ACCESS_EXPIRES_IN`| Access token TTL              | `15m`                            |
-| `JWT_REFRESH_EXPIRES_IN`| Refresh token TTL           | `7d`                             |
-| `PORT`                | API port                      | `4000`                           |
-| `NODE_ENV`            | `development` / `production`  | `development`                    |
-| `COOKIE_DOMAIN`       | Optional cookie domain        | `localhost`                      |
+| Variable                 | Description                  | Example                                    |
+| ------------------------ | ---------------------------- | ------------------------------------------ |
+| `DATABASE_URL`           | PostgreSQL connection string | `postgresql://...@localhost:5432/botarena` |
+| `REDIS_URL`              | Redis connection string      | `redis://localhost:6379`                   |
+| `JWT_SECRET`             | Secret for JWT signing       | Long random string                         |
+| `JWT_ACCESS_EXPIRES_IN`  | Access token TTL             | `15m`                                      |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token TTL            | `7d`                                       |
+| `PORT`                   | API port                     | `4000`                                     |
+| `NODE_ENV`               | `development` / `production` | `development`                              |
+| `COOKIE_DOMAIN`          | Optional cookie domain       | `localhost`                                |
 
 ### Web (`apps/web/.env.local`)
 
-| Variable                 | Description              | Example                     |
-|--------------------------|--------------------------|-----------------------------|
-| `NEXT_PUBLIC_API_URL`    | API base URL             | `http://localhost:4000`     |
-| `NEXT_PUBLIC_WS_URL`     | WebSocket URL            | `ws://localhost:4000/ws`    |
+| Variable              | Description   | Example                  |
+| --------------------- | ------------- | ------------------------ |
+| `NEXT_PUBLIC_API_URL` | API base URL  | `http://localhost:4000`  |
+| `NEXT_PUBLIC_WS_URL`  | WebSocket URL | `ws://localhost:4000/ws` |
 
 ## Auth
 

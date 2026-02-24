@@ -28,16 +28,30 @@ export async function callBackend(
   } = {}
 ): Promise<Response> {
   const { method = "POST", body, cookie } = options;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  const headers: Record<string, string> = {};
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
   if (cookie) {
     headers.Cookie = `${AUTH.cookieName}=${cookie}`;
   }
-  return fetch(`${AUTH.apiUrl}${path}`, {
-    method,
-    headers,
-    body: body ?? undefined,
-    cache: "no-store",
-  });
+  try {
+    return await fetch(`${AUTH.apiUrl}${path}`, {
+      method,
+      headers,
+      body: body ?? undefined,
+      cache: "no-store",
+    });
+  } catch (err) {
+    const isRefused =
+      err instanceof TypeError &&
+      (err as { cause?: { code?: string } }).cause?.code === "ECONNREFUSED";
+    const message = isRefused
+      ? "Auth service unavailable. Is the API server running? (e.g. pnpm dev at repo root)"
+      : "Auth service request failed";
+    return new Response(JSON.stringify({ error: message }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }

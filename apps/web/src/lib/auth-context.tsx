@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import { useRouter } from "next/navigation";
+import { signIn, signOut as authSignOut } from "next-auth/react";
 import type { User } from "@repo/shared";
 import { authApi } from "@/lib/auth/client";
 import { AuthError } from "@/lib/auth/types";
@@ -88,34 +89,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refresh();
   }, [refresh]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    dispatch({ type: "SET_LOADING", payload: true });
-    dispatch({ type: "SET_ERROR", payload: null });
-    try {
-      await authApi.login(email, password);
-      router.push("/dashboard");
-    } catch (e) {
-      const message = e instanceof AuthError ? e.message : "Login failed";
-      dispatch({ type: "SET_ERROR", payload: message });
-      throw e;
-    }
-  }, [router]);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      dispatch({ type: "SET_LOADING", payload: true });
+      dispatch({ type: "SET_ERROR", payload: null });
+      try {
+        const result = await authApi.login(email, password);
+        if (result.oneTimeToken && result.user) {
+          await signIn("one-time-token", {
+            oneTimeToken: result.oneTimeToken,
+            user: JSON.stringify(result.user),
+            redirect: false,
+          });
+        }
+        dispatch({
+          type: "SET_SESSION",
+          payload: { user: result.user, accessToken: result.accessToken },
+        });
+        router.push("/dashboard");
+      } catch (e) {
+        const message = e instanceof AuthError ? e.message : "Login failed";
+        dispatch({ type: "SET_ERROR", payload: message });
+        throw e;
+      }
+    },
+    [router]
+  );
 
-  const signup = useCallback(async (email: string, password: string, name?: string) => {
-    dispatch({ type: "SET_LOADING", payload: true });
-    dispatch({ type: "SET_ERROR", payload: null });
-    try {
-      await authApi.signup(email, password, name);
-      router.push("/dashboard");
-    } catch (e) {
-      const message = e instanceof AuthError ? e.message : "Signup failed";
-      dispatch({ type: "SET_ERROR", payload: message });
-      throw e;
-    }
-  }, [router]);
+  const signup = useCallback(
+    async (email: string, password: string, name?: string) => {
+      dispatch({ type: "SET_LOADING", payload: true });
+      dispatch({ type: "SET_ERROR", payload: null });
+      try {
+        const result = await authApi.signup(email, password, name);
+        if (result.oneTimeToken && result.user) {
+          await signIn("one-time-token", {
+            oneTimeToken: result.oneTimeToken,
+            user: JSON.stringify(result.user),
+            redirect: false,
+          });
+        }
+        dispatch({
+          type: "SET_SESSION",
+          payload: { user: result.user, accessToken: result.accessToken },
+        });
+        router.push("/dashboard");
+      } catch (e) {
+        const message = e instanceof AuthError ? e.message : "Signup failed";
+        dispatch({ type: "SET_ERROR", payload: message });
+        throw e;
+      }
+    },
+    [router]
+  );
 
   const logout = useCallback(async () => {
     try {
+      await authSignOut({ redirect: false });
       await authApi.logout();
     } finally {
       dispatch({ type: "LOGOUT" });

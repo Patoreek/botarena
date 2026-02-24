@@ -15,10 +15,7 @@ export async function POST() {
   };
 
   if (!res.ok) {
-    return NextResponse.json(
-      { error: data.error ?? "Refresh failed" },
-      { status: res.status }
-    );
+    return NextResponse.json({ error: data.error ?? "Refresh failed" }, { status: res.status });
   }
 
   const nextRes = NextResponse.json({

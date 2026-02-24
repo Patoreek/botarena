@@ -18,7 +18,7 @@ async function request<T>(
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  const data = await res.json().catch(() => ({})) as { error?: string };
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
 
   if (!res.ok) {
     throw new AuthError(data.error ?? res.statusText, res.status);
@@ -29,17 +29,23 @@ async function request<T>(
 
 export const authApi = {
   async login(email: string, password: string): Promise<AuthResult> {
-    const data = await request<{ user: User; accessToken: string }>("/api/auth/login", {
-      body: { email, password },
-    });
-    return { user: data.user, accessToken: data.accessToken };
+    const data = await request<{ user: User; accessToken: string; oneTimeToken?: string }>(
+      "/api/auth/login",
+      {
+        body: { email, password },
+      }
+    );
+    return { user: data.user, accessToken: data.accessToken, oneTimeToken: data.oneTimeToken };
   },
 
   async signup(email: string, password: string, name?: string): Promise<AuthResult> {
-    const data = await request<{ user: User; accessToken: string }>("/api/auth/signup", {
-      body: { email, password, name: name?.trim() || undefined },
-    });
-    return { user: data.user, accessToken: data.accessToken };
+    const data = await request<{ user: User; accessToken: string; oneTimeToken?: string }>(
+      "/api/auth/signup",
+      {
+        body: { email, password, name: name?.trim() || undefined },
+      }
+    );
+    return { user: data.user, accessToken: data.accessToken, oneTimeToken: data.oneTimeToken };
   },
 
   async logout(): Promise<void> {
