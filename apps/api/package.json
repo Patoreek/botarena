@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
     "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
     "build": "tsc",
@@ -12,6 +15,7 @@
     "db:migrate": "dotenv -e ../../.env -- prisma migrate deploy",
     "db:migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
     "db:studio": "dotenv -e ../../.env -- prisma studio",
+    "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
     "lint": "eslint src --max-warnings 0",
     "clean": "rm -rf dist"
   },

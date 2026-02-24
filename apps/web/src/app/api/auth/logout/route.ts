@@ -1,26 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { getRefreshTokenFromRequest, callBackend, clearAuthCookie } from "@/lib/auth/server";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const REFRESH_COOKIE = "refreshToken";
-
-/** Proxies logout to backend (revokes token) and clears same-origin cookie */
-export async function POST(request: NextRequest) {
-  const cookieStore = await cookies();
-  const refreshCookie = cookieStore.get(REFRESH_COOKIE);
-
-  if (refreshCookie?.value) {
-    await fetch(`${API_URL}/auth/logout`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Cookie: `${REFRESH_COOKIE}=${refreshCookie.value}`,
-      },
-      cache: "no-store",
-    });
+export async function POST() {
+  const token = await getRefreshTokenFromRequest();
+  if (token) {
+    await callBackend("/auth/logout", { cookie: token });
   }
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.delete(REFRESH_COOKIE);
+  clearAuthCookie(res);
   return res;
 }

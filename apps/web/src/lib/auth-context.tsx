@@ -1,8 +1,12 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
+import { useRouter } from "next/navigation";
 import type { User } from "@repo/shared";
-import { apiFetch } from "@/lib/api";
+import { authApi } from "@/lib/auth/client";
+import { AuthError } from "@/lib/auth/types";
+
+// --- State ---
 
 type AuthState = {
   user: User | null;
@@ -11,63 +15,72 @@ type AuthState = {
   error: string | null;
 };
 
+type AuthAction =
+  | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_SESSION"; payload: { user: User; accessToken: string } | null }
+  | { type: "SET_ACCESS_TOKEN"; payload: string | null }
+  | { type: "SET_ERROR"; payload: string | null }
+  | { type: "LOGOUT" };
+
+const initialState: AuthState = {
+  user: null,
+  accessToken: null,
+  loading: true,
+  error: null,
+};
+
+function authReducer(state: AuthState, action: AuthAction): AuthState {
+  switch (action.type) {
+    case "SET_LOADING":
+      return { ...state, loading: action.payload };
+    case "SET_SESSION":
+      return {
+        ...state,
+        user: action.payload?.user ?? null,
+        accessToken: action.payload?.accessToken ?? null,
+        loading: false,
+        error: null,
+      };
+    case "SET_ERROR":
+      return { ...state, error: action.payload, loading: false };
+    case "SET_ACCESS_TOKEN":
+      return {
+        ...state,
+        accessToken: action.payload,
+        ...(action.payload === null ? { user: null } : {}),
+      };
+    case "LOGOUT":
+      return { ...initialState, loading: false };
+    default:
+      return state;
+  }
+}
+
+// --- Context ---
+
 type AuthContextValue = AuthState & {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   setAccessToken: (token: string | null) => void;
+  clearError: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/** Call our Next.js API routes (same-origin). Cookie is set in the response, so no cross-origin cookie issues. */
-async function authFetch<T>(
-  path: string,
-  options: RequestInit & { body?: object } = {}
-): Promise<T> {
-  const { body, ...rest } = options;
-  const res = await fetch(path, {
-    ...rest,
-    method: rest.method ?? (body ? "POST" : "GET"),
-    credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      ...rest.headers,
-    },
-    body: body ? JSON.stringify(body) : rest.body,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? res.statusText);
-  }
-  return data as T;
-}
+// --- Provider ---
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    accessToken: null,
-    loading: true,
-    error: null,
-  });
+  const router = useRouter();
+  const [state, dispatch] = useReducer(authReducer, initialState);
 
   const refresh = useCallback(async () => {
     try {
-      const data = await authFetch<{ accessToken?: string }>("/api/auth/refresh", {
-        method: "POST",
-      });
-      const accessToken = data.accessToken ?? null;
-      if (!accessToken) {
-        setState((s) => ({ ...s, user: null, accessToken: null, loading: false, error: null }));
-        return;
-      }
-      const user = await apiFetch<User>("/me", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      setState((s) => ({ ...s, user, accessToken, loading: false, error: null }));
+      const session = await authApi.refresh();
+      dispatch({ type: "SET_SESSION", payload: session });
     } catch {
-      setState((s) => ({ ...s, user: null, accessToken: null, loading: false, error: null }));
+      dispatch({ type: "SET_SESSION", payload: null });
     }
   }, []);
 
@@ -76,63 +89,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const login = useCallback(async (email: string, password: string) => {
-    setState((s) => ({ ...s, loading: true, error: null }));
+    dispatch({ type: "SET_LOADING", payload: true });
+    dispatch({ type: "SET_ERROR", payload: null });
     try {
-      const data = await authFetch<{ user: User; accessToken: string }>("/api/auth/login", {
-        body: { email, password },
-      });
-      setState((s) => ({
-        ...s,
-        user: data.user,
-        accessToken: data.accessToken,
-        loading: false,
-        error: null,
-      }));
-      window.location.href = "/dashboard";
+      await authApi.login(email, password);
+      router.push("/dashboard");
     } catch (e) {
-      setState((s) => ({
-        ...s,
-        loading: false,
-        error: e instanceof Error ? e.message : "Login failed",
-      }));
+      const message = e instanceof AuthError ? e.message : "Login failed";
+      dispatch({ type: "SET_ERROR", payload: message });
       throw e;
     }
-  }, []);
+  }, [router]);
 
   const signup = useCallback(async (email: string, password: string, name?: string) => {
-    setState((s) => ({ ...s, loading: true, error: null }));
+    dispatch({ type: "SET_LOADING", payload: true });
+    dispatch({ type: "SET_ERROR", payload: null });
     try {
-      const data = await authFetch<{ user: User; accessToken: string }>("/api/auth/signup", {
-        body: { email, password, name: name?.trim() || undefined },
-      });
-      setState((s) => ({
-        ...s,
-        user: data.user,
-        accessToken: data.accessToken,
-        loading: false,
-        error: null,
-      }));
-      window.location.href = "/dashboard";
+      await authApi.signup(email, password, name);
+      router.push("/dashboard");
     } catch (e) {
-      setState((s) => ({
-        ...s,
-        loading: false,
-        error: e instanceof Error ? e.message : "Signup failed",
-      }));
+      const message = e instanceof AuthError ? e.message : "Signup failed";
+      dispatch({ type: "SET_ERROR", payload: message });
       throw e;
     }
-  }, []);
+  }, [router]);
 
   const logout = useCallback(async () => {
     try {
-      await authFetch("/api/auth/logout", { method: "POST" });
+      await authApi.logout();
     } finally {
-      setState({ user: null, accessToken: null, loading: false, error: null });
+      dispatch({ type: "LOGOUT" });
     }
   }, []);
 
   const setAccessToken = useCallback((token: string | null) => {
-    setState((s) => ({ ...s, accessToken: token }));
+    dispatch({ type: "SET_ACCESS_TOKEN", payload: token });
+  }, []);
+
+  const clearError = useCallback(() => {
+    dispatch({ type: "SET_ERROR", payload: null });
   }, []);
 
   const value: AuthContextValue = {
@@ -142,12 +137,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     refresh,
     setAccessToken,
+    clearError,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
