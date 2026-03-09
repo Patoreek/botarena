@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import fp from "fastify-plugin";
 import { verifyAccessToken } from "../lib/auth.js";
 import { prisma } from "../lib/db.js";
 import { meRoutes } from "../routes/me.js";
@@ -7,7 +8,7 @@ export interface AuthenticatedRequest extends FastifyRequest {
   user: { id: string; email: string };
 }
 
-export async function authPlugin(fastify: FastifyInstance) {
+export const authPlugin = fp(async function authPlugin(fastify: FastifyInstance) {
   fastify.decorate("authenticate", async function (request: FastifyRequest, reply: FastifyReply) {
     const authHeader = request.headers.authorization;
     const token = authHeader?.startsWith("Bearer ")
@@ -35,7 +36,7 @@ export async function authPlugin(fastify: FastifyInstance) {
   });
 
   await fastify.register(meRoutes, { prefix: "/" });
-}
+});
 
 declare module "fastify" {
   interface FastifyInstance {

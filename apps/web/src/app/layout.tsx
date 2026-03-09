@@ -3,6 +3,7 @@ import { Rubik } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { SessionProvider } from "next-auth/react";
 import { AuthProvider } from "@/lib/auth-context";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const rubik = Rubik({
@@ -27,7 +28,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           <SessionProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              {children}
+              <Toaster richColors closeButton />
+            </AuthProvider>
           </SessionProvider>
         </ThemeProvider>
       </body>

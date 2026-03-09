@@ -8,6 +8,7 @@ import { authPlugin } from "./plugins/auth.js";
 import { authRoutes } from "./routes/auth.js";
 import { meRoutes } from "./routes/me.js";
 import { wsRoutes } from "./routes/ws.js";
+import { botRoutes } from "./routes/bots.js";
 
 const PORT = parseInt(process.env.PORT ?? "4000", 10);
 const isDev = process.env.NODE_ENV !== "production";
@@ -42,6 +43,7 @@ async function main() {
   await fastify.register(authPlugin);
 
   fastify.register(authRoutes, { prefix: "/" });
+  fastify.register(botRoutes, { prefix: "/" });
   await fastify.register(wsRoutes, { prefix: "/" });
 
   fastify.get("/health", async () => ({ ok: true }));

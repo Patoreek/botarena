@@ -7,22 +7,115 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum BotStrategy {
+  GRID
+}
+
+enum BotStatus {
+  IDLE
+  RUNNING
+  STOPPED
+  ERROR
+}
+
+enum GridType {
+  ARITHMETIC
+  GEOMETRIC
+}
+
+enum BotLogAction {
+  TRADE_BUY
+  TRADE_SELL
+  BOT_START
+  BOT_STOP
+  BOT_ERROR
+  CONFIG_CHANGE
+  MANUAL
+}
+
 model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
-  passwordHash String         @map("password_hash")
-  name         String?
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  name          String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
   refreshTokens RefreshToken[]
+  bots          Bot[]
 }
 
 model RefreshToken {
-  id        String   @id @default(cuid())
-  tokenHash String   @map("token_hash")
-  userId    String   @map("user_id")
-  expiresAt DateTime @map("expires_at")
+  id        String    @id @default(cuid())
+  tokenHash String    @map("token_hash")
+  userId    String    @map("user_id")
+  expiresAt DateTime  @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Bot {
+  id          String      @id @default(cuid())
+  userId      String      @map("user_id")
+  name        String
+  strategy    BotStrategy
+  status      BotStatus   @default(IDLE)
+  exchange    String
+  tradingPair String      @map("trading_pair")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stats      BotStats?
+  gridConfig GridStrategyConfig?
+  logs       BotLog[]
+
+  @@index([userId])
+}
+
+model BotStats {
+  id            String   @id @default(cuid())
+  botId         String   @unique @map("bot_id")
+  totalProfit   Float    @default(0) @map("total_profit")
+  totalLoss     Float    @default(0) @map("total_loss")
+  netPnl        Float    @default(0) @map("net_pnl")
+  totalBuys     Int      @default(0) @map("total_buys")
+  totalSells    Int      @default(0) @map("total_sells")
+  totalTrades   Int      @default(0) @map("total_trades")
+  winCount      Int      @default(0) @map("win_count")
+  lossCount     Int      @default(0) @map("loss_count")
+  successRate   Float    @default(0) @map("success_rate")
+  maxDrawdown   Float    @default(0) @map("max_drawdown")
+  roi           Float    @default(0)
+  lastUpdatedAt DateTime @default(now()) @map("last_updated_at")
+
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+}
+
+model GridStrategyConfig {
+  id              String   @id @default(cuid())
+  botId           String   @unique @map("bot_id")
+  upperPrice      Float    @map("upper_price")
+  lowerPrice      Float    @map("lower_price")
+  gridCount       Int      @map("grid_count")
+  gridType        GridType @default(ARITHMETIC) @map("grid_type")
+  totalInvestment Float    @map("total_investment")
+  amountPerGrid   Float    @map("amount_per_grid")
+  takeProfitPrice Float?   @map("take_profit_price")
+  stopLossPrice   Float?   @map("stop_loss_price")
+
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+}
+
+model BotLog {
+  id        String       @id @default(cuid())
+  botId     String       @map("bot_id")
+  action    BotLogAction
+  message   String
+  metadata  Json?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId, createdAt(sort: Desc)])
 }

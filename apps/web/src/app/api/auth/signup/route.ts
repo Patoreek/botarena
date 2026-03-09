@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
       id: string;
       email: string;
       name?: string | null;
-      createdAt?: unknown;
-      updatedAt?: unknown;
+      createdAt?: string | Date;
+      updatedAt?: string | Date;
     };
     accessToken?: string;
     refreshToken?: string;
