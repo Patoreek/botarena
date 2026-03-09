@@ -16,9 +16,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         <div className="absolute inset-0 flex flex-col justify-end p-10 text-white">
-          <p className="mb-4 text-xs font-medium uppercase tracking-widest text-white/70">
-            Botarena
-          </p>
+          <div className="mb-4 flex items-center gap-2">
+            <Image src="/logo.svg" alt="" width={36} height={36} className="rounded" />
+            <span className="text-xs font-medium uppercase tracking-widest text-white/70">
+              Botarena
+            </span>
+          </div>
           <h2 className="text-3xl font-semibold leading-tight md:text-4xl">
             Get Everything You Want
           </h2>
@@ -32,7 +35,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Right panel - form (always visible, takes remaining space) */}
       <main className="relative z-10 flex min-w-0 flex-col bg-background min-h-screen lg:min-h-0">
         <header className="flex shrink-0 items-center p-6 md:p-10">
-          <Link href="/" className="text-lg font-semibold text-foreground">
+          <Link href="/" className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <Image src="/logo.svg" alt="Botarena" width={32} height={32} className="rounded" />
             Botarena
           </Link>
         </header>

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { authGuard } from "@/lib/auth-guard";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
@@ -14,7 +15,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex min-h-screen">
       <aside className="flex w-56 flex-col border-r bg-card">
         <div className="flex h-14 items-center border-b px-4">
-          <Link href="/dashboard" className="font-semibold">
+          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+            <Image src="/logo.svg" alt="Botarena" width={28} height={28} className="rounded" />
             Botarena
           </Link>
         </div>
