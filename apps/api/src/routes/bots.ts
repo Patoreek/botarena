@@ -20,8 +20,6 @@ function serializeBot(bot: any) {
     name: bot.name,
     strategy: bot.strategy,
     status: bot.status,
-    exchange: bot.exchange,
-    tradingPair: bot.tradingPair,
     createdAt: serializeDate(bot.createdAt),
     updatedAt: serializeDate(bot.updatedAt),
     stats: bot.stats
@@ -50,6 +48,15 @@ function serializeBot(bot: any) {
           amountPerGrid: bot.gridConfig.amountPerGrid,
           takeProfitPrice: bot.gridConfig.takeProfitPrice,
           stopLossPrice: bot.gridConfig.stopLossPrice,
+          triggerPrice: bot.gridConfig.triggerPrice,
+          gridMode: bot.gridConfig.gridMode,
+          orderType: bot.gridConfig.orderType,
+          trailingUp: bot.gridConfig.trailingUp,
+          trailingDown: bot.gridConfig.trailingDown,
+          stopLossAction: bot.gridConfig.stopLossAction,
+          takeProfitAction: bot.gridConfig.takeProfitAction,
+          minProfitPerGrid: bot.gridConfig.minProfitPerGrid,
+          maxOpenOrders: bot.gridConfig.maxOpenOrders,
         }
       : null,
   };
@@ -109,15 +116,13 @@ export async function botRoutes(fastify: FastifyInstance) {
       if (!parsed.success) {
         return reply.status(400).send({ error: "Validation failed", details: parsed.error.flatten() });
       }
-      const { name, strategy, exchange, tradingPair, gridConfig } = parsed.data;
+      const { name, strategy, gridConfig } = parsed.data;
 
       const bot = await prisma.bot.create({
         data: {
           userId: req.user.id,
           name,
           strategy,
-          exchange,
-          tradingPair,
           stats: { create: {} },
           gridConfig: {
             create: {
@@ -129,6 +134,15 @@ export async function botRoutes(fastify: FastifyInstance) {
               amountPerGrid: gridConfig.amountPerGrid,
               takeProfitPrice: gridConfig.takeProfitPrice ?? null,
               stopLossPrice: gridConfig.stopLossPrice ?? null,
+              triggerPrice: gridConfig.triggerPrice ?? null,
+              gridMode: gridConfig.gridMode,
+              orderType: gridConfig.orderType,
+              trailingUp: gridConfig.trailingUp,
+              trailingDown: gridConfig.trailingDown,
+              stopLossAction: gridConfig.stopLossAction,
+              takeProfitAction: gridConfig.takeProfitAction,
+              minProfitPerGrid: gridConfig.minProfitPerGrid ?? null,
+              maxOpenOrders: gridConfig.maxOpenOrders ?? null,
             },
           },
           logs: {
@@ -185,12 +199,10 @@ export async function botRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Bot not found" });
       }
 
-      const { name, exchange, tradingPair, gridConfig } = parsed.data;
+      const { name, gridConfig } = parsed.data;
 
       const botData: Prisma.BotUpdateInput = {};
       if (name !== undefined) botData.name = name;
-      if (exchange !== undefined) botData.exchange = exchange;
-      if (tradingPair !== undefined) botData.tradingPair = tradingPair;
 
       if (gridConfig && existing.gridConfig) {
         botData.gridConfig = {
@@ -203,6 +215,15 @@ export async function botRoutes(fastify: FastifyInstance) {
             ...(gridConfig.amountPerGrid !== undefined && { amountPerGrid: gridConfig.amountPerGrid }),
             ...(gridConfig.takeProfitPrice !== undefined && { takeProfitPrice: gridConfig.takeProfitPrice }),
             ...(gridConfig.stopLossPrice !== undefined && { stopLossPrice: gridConfig.stopLossPrice }),
+            ...(gridConfig.triggerPrice !== undefined && { triggerPrice: gridConfig.triggerPrice }),
+            ...(gridConfig.gridMode !== undefined && { gridMode: gridConfig.gridMode }),
+            ...(gridConfig.orderType !== undefined && { orderType: gridConfig.orderType }),
+            ...(gridConfig.trailingUp !== undefined && { trailingUp: gridConfig.trailingUp }),
+            ...(gridConfig.trailingDown !== undefined && { trailingDown: gridConfig.trailingDown }),
+            ...(gridConfig.stopLossAction !== undefined && { stopLossAction: gridConfig.stopLossAction }),
+            ...(gridConfig.takeProfitAction !== undefined && { takeProfitAction: gridConfig.takeProfitAction }),
+            ...(gridConfig.minProfitPerGrid !== undefined && { minProfitPerGrid: gridConfig.minProfitPerGrid }),
+            ...(gridConfig.maxOpenOrders !== undefined && { maxOpenOrders: gridConfig.maxOpenOrders }),
           },
         };
       }

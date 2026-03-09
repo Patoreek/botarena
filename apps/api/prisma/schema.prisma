@@ -23,6 +23,22 @@ enum GridType {
   GEOMETRIC
 }
 
+enum GridMode {
+  LONG
+  SHORT
+  NEUTRAL
+}
+
+enum OrderType {
+  LIMIT
+  MARKET
+}
+
+enum StopAction {
+  CLOSE_ALL
+  STOP_ONLY
+}
+
 enum BotLogAction {
   TRADE_BUY
   TRADE_SELL
@@ -60,8 +76,6 @@ model Bot {
   name        String
   strategy    BotStrategy
   status      BotStatus   @default(IDLE)
-  exchange    String
-  tradingPair String      @map("trading_pair")
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
@@ -103,6 +117,16 @@ model GridStrategyConfig {
   amountPerGrid   Float    @map("amount_per_grid")
   takeProfitPrice Float?   @map("take_profit_price")
   stopLossPrice   Float?   @map("stop_loss_price")
+
+  triggerPrice     Float?     @map("trigger_price")
+  gridMode         GridMode   @default(NEUTRAL) @map("grid_mode")
+  orderType        OrderType  @default(LIMIT) @map("order_type")
+  trailingUp       Boolean    @default(false) @map("trailing_up")
+  trailingDown     Boolean    @default(false) @map("trailing_down")
+  stopLossAction   StopAction @default(STOP_ONLY) @map("stop_loss_action")
+  takeProfitAction StopAction @default(STOP_ONLY) @map("take_profit_action")
+  minProfitPerGrid Float?     @map("min_profit_per_grid")
+  maxOpenOrders    Int?       @map("max_open_orders")
 
   bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 }

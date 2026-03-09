@@ -165,8 +165,6 @@ export default function BotsPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Strategy</TableHead>
-                  <TableHead>Exchange</TableHead>
-                  <TableHead>Pair</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Net PnL</TableHead>
                   <TableHead className="text-right">Win Rate</TableHead>
@@ -184,8 +182,6 @@ export default function BotsPage() {
                     <TableCell>
                       <Badge variant="outline">{bot.strategy}</Badge>
                     </TableCell>
-                    <TableCell>{bot.exchange}</TableCell>
-                    <TableCell>{bot.tradingPair}</TableCell>
                     <TableCell>
                       <BotStatusBadge status={bot.status} />
                     </TableCell>
@@ -241,8 +237,6 @@ export default function BotsPage() {
                 </div>
                 <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                   <Badge variant="outline">{bot.strategy}</Badge>
-                  <span>{bot.exchange}</span>
-                  <span>{bot.tradingPair}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span>

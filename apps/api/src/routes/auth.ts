@@ -50,7 +50,8 @@ export async function authRoutes(fastify: FastifyInstance) {
           .status(400)
           .send({ error: "Validation failed", details: parsed.error.flatten() });
       }
-      const { email, password, name } = parsed.data;
+      const email = parsed.data.email.toLowerCase();
+      const { password, name } = parsed.data;
 
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
@@ -94,7 +95,8 @@ export async function authRoutes(fastify: FastifyInstance) {
           .status(400)
           .send({ error: "Validation failed", details: parsed.error.flatten() });
       }
-      const { email, password } = parsed.data;
+      const email = parsed.data.email.toLowerCase();
+      const { password } = parsed.data;
 
       const user = await prisma.user.findUnique({ where: { email } });
       if (!user || !(await verifyPassword(user.passwordHash, password))) {

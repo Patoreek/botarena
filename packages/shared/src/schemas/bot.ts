@@ -9,6 +9,15 @@ export type BotStatus = z.infer<typeof botStatus>;
 export const gridType = z.enum(["ARITHMETIC", "GEOMETRIC"]);
 export type GridType = z.infer<typeof gridType>;
 
+export const gridMode = z.enum(["LONG", "SHORT", "NEUTRAL"]);
+export type GridMode = z.infer<typeof gridMode>;
+
+export const orderType = z.enum(["LIMIT", "MARKET"]);
+export type OrderType = z.infer<typeof orderType>;
+
+export const stopAction = z.enum(["CLOSE_ALL", "STOP_ONLY"]);
+export type StopAction = z.infer<typeof stopAction>;
+
 export const botLogAction = z.enum([
   "TRADE_BUY",
   "TRADE_SELL",
@@ -31,6 +40,15 @@ export const gridStrategyConfigSchema = z.object({
   amountPerGrid: z.number().positive(),
   takeProfitPrice: z.number().positive().optional(),
   stopLossPrice: z.number().positive().optional(),
+  triggerPrice: z.number().positive().optional(),
+  gridMode: gridMode.default("NEUTRAL"),
+  orderType: orderType.default("LIMIT"),
+  trailingUp: z.boolean().default(false),
+  trailingDown: z.boolean().default(false),
+  stopLossAction: stopAction.default("STOP_ONLY"),
+  takeProfitAction: stopAction.default("STOP_ONLY"),
+  minProfitPerGrid: z.number().positive().optional(),
+  maxOpenOrders: z.number().int().min(1).optional(),
 });
 export type GridStrategyConfig = z.infer<typeof gridStrategyConfigSchema>;
 
@@ -40,8 +58,6 @@ export const createBotBody = z
   .object({
     name: z.string().min(1).max(100),
     strategy: botStrategy,
-    exchange: z.string().min(1).max(50),
-    tradingPair: z.string().min(1).max(20),
     gridConfig: gridStrategyConfigSchema,
   })
   .refine((d) => d.gridConfig.upperPrice > d.gridConfig.lowerPrice, {
@@ -53,8 +69,6 @@ export type CreateBotBody = z.infer<typeof createBotBody>;
 export const updateBotBody = z
   .object({
     name: z.string().min(1).max(100).optional(),
-    exchange: z.string().min(1).max(50).optional(),
-    tradingPair: z.string().min(1).max(20).optional(),
     gridConfig: gridStrategyConfigSchema.partial().optional(),
   })
   .refine(
@@ -100,6 +114,15 @@ export const gridConfigResponseSchema = z.object({
   amountPerGrid: z.number(),
   takeProfitPrice: z.number().nullable(),
   stopLossPrice: z.number().nullable(),
+  triggerPrice: z.number().nullable(),
+  gridMode: gridMode,
+  orderType: orderType,
+  trailingUp: z.boolean(),
+  trailingDown: z.boolean(),
+  stopLossAction: stopAction,
+  takeProfitAction: stopAction,
+  minProfitPerGrid: z.number().nullable(),
+  maxOpenOrders: z.number().nullable(),
 });
 export type GridConfigResponse = z.infer<typeof gridConfigResponseSchema>;
 
@@ -108,8 +131,6 @@ export const botResponseSchema = z.object({
   name: z.string(),
   strategy: botStrategy,
   status: botStatus,
-  exchange: z.string(),
-  tradingPair: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
   stats: botStatsSchema.nullable(),
@@ -122,8 +143,6 @@ export const botListItemSchema = z.object({
   name: z.string(),
   strategy: botStrategy,
   status: botStatus,
-  exchange: z.string(),
-  tradingPair: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
   stats: botStatsSchema.nullable(),

@@ -127,7 +127,6 @@ export default function BotDetailPage() {
               <BotStatusBadge status={bot.status} />
             </div>
             <p className="text-sm text-muted-foreground">
-              {bot.exchange} &middot; {bot.tradingPair} &middot;{" "}
               <Badge variant="outline">{bot.strategy}</Badge>
             </p>
           </div>
@@ -235,51 +234,115 @@ export default function BotDetailPage() {
 
       {/* Grid Config */}
       {bot.gridConfig && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Grid Configuration</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-4">
-              <div>
-                <p className="text-muted-foreground">Upper Price</p>
-                <p className="font-medium">{bot.gridConfig.upperPrice}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Lower Price</p>
-                <p className="font-medium">{bot.gridConfig.lowerPrice}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Grid Count</p>
-                <p className="font-medium">{bot.gridConfig.gridCount}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Grid Type</p>
-                <p className="font-medium capitalize">{bot.gridConfig.gridType.toLowerCase()}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Total Investment</p>
-                <p className="font-medium">{bot.gridConfig.totalInvestment}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Amount Per Grid</p>
-                <p className="font-medium">{bot.gridConfig.amountPerGrid}</p>
-              </div>
-              {bot.gridConfig.takeProfitPrice && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Grid Configuration</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-4">
                 <div>
-                  <p className="text-muted-foreground">Take Profit</p>
-                  <p className="font-medium">{bot.gridConfig.takeProfitPrice}</p>
+                  <p className="text-muted-foreground">Upper Price</p>
+                  <p className="font-medium">{bot.gridConfig.upperPrice}</p>
                 </div>
-              )}
-              {bot.gridConfig.stopLossPrice && (
                 <div>
-                  <p className="text-muted-foreground">Stop Loss</p>
-                  <p className="font-medium">{bot.gridConfig.stopLossPrice}</p>
+                  <p className="text-muted-foreground">Lower Price</p>
+                  <p className="font-medium">{bot.gridConfig.lowerPrice}</p>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                <div>
+                  <p className="text-muted-foreground">Grid Count</p>
+                  <p className="font-medium">{bot.gridConfig.gridCount}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Grid Type</p>
+                  <p className="font-medium capitalize">{bot.gridConfig.gridType.toLowerCase()}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Grid Mode</p>
+                  <p className="font-medium capitalize">{bot.gridConfig.gridMode.toLowerCase()}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Total Investment</p>
+                  <p className="font-medium">{bot.gridConfig.totalInvestment}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Amount Per Grid</p>
+                  <p className="font-medium">{bot.gridConfig.amountPerGrid}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Order Type</p>
+                  <p className="font-medium capitalize">{bot.gridConfig.orderType.toLowerCase()}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Risk Management</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-4">
+                {bot.gridConfig.takeProfitPrice && (
+                  <div>
+                    <p className="text-muted-foreground">Take Profit</p>
+                    <p className="font-medium">{bot.gridConfig.takeProfitPrice}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-muted-foreground">On Take Profit</p>
+                  <p className="font-medium">{bot.gridConfig.takeProfitAction === "CLOSE_ALL" ? "Close All" : "Stop Only"}</p>
+                </div>
+                {bot.gridConfig.stopLossPrice && (
+                  <div>
+                    <p className="text-muted-foreground">Stop Loss</p>
+                    <p className="font-medium">{bot.gridConfig.stopLossPrice}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-muted-foreground">On Stop Loss</p>
+                  <p className="font-medium">{bot.gridConfig.stopLossAction === "CLOSE_ALL" ? "Close All" : "Stop Only"}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Advanced Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-4">
+                {bot.gridConfig.triggerPrice && (
+                  <div>
+                    <p className="text-muted-foreground">Trigger Price</p>
+                    <p className="font-medium">{bot.gridConfig.triggerPrice}</p>
+                  </div>
+                )}
+                {bot.gridConfig.minProfitPerGrid && (
+                  <div>
+                    <p className="text-muted-foreground">Min Profit Per Grid</p>
+                    <p className="font-medium">{bot.gridConfig.minProfitPerGrid}%</p>
+                  </div>
+                )}
+                {bot.gridConfig.maxOpenOrders && (
+                  <div>
+                    <p className="text-muted-foreground">Max Open Orders</p>
+                    <p className="font-medium">{bot.gridConfig.maxOpenOrders}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-muted-foreground">Trailing Up</p>
+                  <p className="font-medium">{bot.gridConfig.trailingUp ? "Enabled" : "Disabled"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Trailing Down</p>
+                  <p className="font-medium">{bot.gridConfig.trailingDown ? "Enabled" : "Disabled"}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Charts placeholder */}
