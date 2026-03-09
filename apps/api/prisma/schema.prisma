@@ -39,6 +39,11 @@ enum StopAction {
   STOP_ONLY
 }
 
+enum ApiProvider {
+  BINANCE
+  OPENAI
+}
+
 enum BotLogAction {
   TRADE_BUY
   TRADE_SELL
@@ -58,6 +63,7 @@ model User {
   updatedAt     DateTime       @updatedAt @map("updated_at")
   refreshTokens RefreshToken[]
   bots          Bot[]
+  apiKeys       ApiKey[]
 }
 
 model RefreshToken {
@@ -142,4 +148,21 @@ model BotLog {
   bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@index([botId, createdAt(sort: Desc)])
+}
+
+model ApiKey {
+  id              String      @id @default(cuid())
+  userId          String      @map("user_id")
+  provider        ApiProvider
+  label           String
+  encryptedKey    String      @map("encrypted_key")
+  encryptedSecret String?     @map("encrypted_secret")
+  keyHint         String      @map("key_hint")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
 }
