@@ -10,6 +10,7 @@ import { meRoutes } from "./routes/me.js";
 import { wsRoutes } from "./routes/ws.js";
 import { botRoutes } from "./routes/bots.js";
 import { apiKeyRoutes } from "./routes/api-keys.js";
+import { runRoutes } from "./routes/runs.js";
 
 const PORT = parseInt(process.env.PORT ?? "4000", 10);
 const isDev = process.env.NODE_ENV !== "production";
@@ -46,6 +47,7 @@ async function main() {
   fastify.register(authRoutes, { prefix: "/" });
   fastify.register(botRoutes, { prefix: "/" });
   fastify.register(apiKeyRoutes, { prefix: "/" });
+  fastify.register(runRoutes, { prefix: "/" });
   await fastify.register(wsRoutes, { prefix: "/" });
 
   fastify.get("/health", async () => ({ ok: true }));

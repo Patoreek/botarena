@@ -44,6 +44,41 @@ enum ApiProvider {
   OPENAI
 }
 
+enum RunStatus {
+  PENDING
+  RUNNING
+  PAUSED
+  STOPPED
+  COMPLETED
+  ERROR
+}
+
+enum RunInterval {
+  ONE_SECOND
+  FIVE_SECONDS
+  FIFTEEN_SECONDS
+  THIRTY_SECONDS
+  ONE_MINUTE
+  FIVE_MINUTES
+  FIFTEEN_MINUTES
+  THIRTY_MINUTES
+  ONE_HOUR
+  FOUR_HOURS
+  ONE_DAY
+}
+
+enum RunLogAction {
+  RUN_START
+  RUN_PAUSE
+  RUN_RESUME
+  RUN_STOP
+  RUN_COMPLETE
+  RUN_ERROR
+  TRADE_BUY
+  TRADE_SELL
+  CONFIG_CHANGE
+}
+
 enum BotLogAction {
   TRADE_BUY
   TRADE_SELL
@@ -89,6 +124,7 @@ model Bot {
   stats      BotStats?
   gridConfig GridStrategyConfig?
   logs       BotLog[]
+  runs       BotRun[]
 
   @@index([userId])
 }
@@ -148,6 +184,47 @@ model BotLog {
   bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@index([botId, createdAt(sort: Desc)])
+}
+
+model BotRun {
+  id          String      @id @default(cuid())
+  botId       String      @map("bot_id")
+  exchange    ApiProvider
+  marketPair  String      @map("market_pair")
+  interval    RunInterval
+  status      RunStatus   @default(PENDING)
+  startedAt   DateTime?   @map("started_at")
+  stoppedAt   DateTime?   @map("stopped_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  totalProfit   Float @default(0) @map("total_profit")
+  totalLoss     Float @default(0) @map("total_loss")
+  netPnl        Float @default(0) @map("net_pnl")
+  totalBuys     Int   @default(0) @map("total_buys")
+  totalSells    Int   @default(0) @map("total_sells")
+  totalTrades   Int   @default(0) @map("total_trades")
+  winCount      Int   @default(0) @map("win_count")
+  lossCount     Int   @default(0) @map("loss_count")
+  roi           Float @default(0)
+
+  bot  Bot        @relation(fields: [botId], references: [id], onDelete: Cascade)
+  logs RunLog[]
+
+  @@index([botId, createdAt(sort: Desc)])
+}
+
+model RunLog {
+  id        String       @id @default(cuid())
+  runId     String       @map("run_id")
+  action    RunLogAction
+  message   String
+  metadata  Json?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  run BotRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, createdAt(sort: Desc)])
 }
 
 model ApiKey {

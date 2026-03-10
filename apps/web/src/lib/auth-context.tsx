@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, signOut as authSignOut } from "next-auth/react";
 import type { User } from "@repo/shared";
@@ -72,21 +72,34 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // --- Provider ---
 
+const REFRESH_INTERVAL_MS = 13 * 60 * 1000; // 13 min — well before the 15-min access token expiry
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const refreshInFlight = useRef(false);
+  const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
     try {
       const session = await authApi.refresh();
       dispatch({ type: "SET_SESSION", payload: session });
     } catch {
       dispatch({ type: "SET_SESSION", payload: null });
+    } finally {
+      refreshInFlight.current = false;
     }
   }, []);
 
   useEffect(() => {
     refresh();
+
+    refreshTimer.current = setInterval(refresh, REFRESH_INTERVAL_MS);
+    return () => {
+      if (refreshTimer.current) clearInterval(refreshTimer.current);
+    };
   }, [refresh]);
 
   const login = useCallback(
