@@ -21,13 +21,15 @@ async function main() {
   await fastify.register(cors, {
     origin: isDev
       ? [
-          // "http://localhost:3000",
-          // "http://127.0.0.1:3000",
+          "http://localhost:3000",
+          "http://127.0.0.1:3000",
           "http://localhost:3001",
           "http://127.0.0.1:3001",
         ]
       : true,
     credentials: true,
+    methods: ["GET", "HEAD", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   });
 
   await fastify.register(cookie, {

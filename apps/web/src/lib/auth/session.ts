@@ -5,7 +5,8 @@ import type { Session } from "./types";
 
 /**
  * Server-only: get current session from refresh cookie.
- * Calls backend /auth/refresh with the cookie and returns user + accessToken, or null.
+ * Uses /auth/verify which validates the token WITHOUT rotating it,
+ * so the browser's cookie stays valid for client-side refresh.
  */
 export async function getSession(): Promise<Session | null> {
   const store = await cookies();
@@ -13,7 +14,7 @@ export async function getSession(): Promise<Session | null> {
   if (!token) return null;
 
   try {
-    const refreshRes = await fetch(`${AUTH.apiUrl}/auth/refresh`, {
+    const res = await fetch(`${AUTH.apiUrl}/auth/verify`, {
       method: "POST",
       headers: {
         Cookie: `${AUTH.cookieName}=${token}`,
@@ -21,18 +22,10 @@ export async function getSession(): Promise<Session | null> {
       cache: "no-store",
     });
 
-    if (!refreshRes.ok) return null;
+    if (!res.ok) return null;
 
-    const { accessToken } = (await refreshRes.json()) as { accessToken: string };
-    const meRes = await fetch(`${AUTH.apiUrl}/me`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-    });
-
-    if (!meRes.ok) return null;
-
-    const user = (await meRes.json()) as User;
-    return { user, accessToken };
+    const data = (await res.json()) as { user: User; accessToken: string };
+    return { user: data.user, accessToken: data.accessToken };
   } catch {
     return null;
   }

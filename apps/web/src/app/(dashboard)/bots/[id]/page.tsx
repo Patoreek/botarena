@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -17,6 +17,10 @@ import {
   Activity,
   RotateCcw,
   Eye,
+  Zap,
+  CheckCircle2,
+  XCircle,
+  MinusCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -24,12 +28,13 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { useBot, useBotLogs } from "@/hooks/use-bots";
-import { useRuns, useRunLogs } from "@/hooks/use-runs";
-import { INTERVAL_LABELS } from "@repo/shared";
-import type { RunResponse, RunInterval } from "@repo/shared";
+import { useRuns, useRun, useRunLogs } from "@/hooks/use-runs";
+import { useMarketData } from "@/hooks/use-market-data";
+import { INTERVAL_LABELS, INTERVAL_MS } from "@repo/shared";
+import type { RunResponse, RunInterval, Kline, TickMetadata, RunLogEntry } from "@repo/shared";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -131,7 +136,6 @@ function OverviewTab({ bot }: { bot: any }) {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader><CardTitle>Risk Management</CardTitle></CardHeader>
             <CardContent>
@@ -143,7 +147,6 @@ function OverviewTab({ bot }: { bot: any }) {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader><CardTitle>Advanced Settings</CardTitle></CardHeader>
             <CardContent>
@@ -189,6 +192,206 @@ function OverviewTab({ bot }: { bot: any }) {
   );
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatNum(v: string | number, decimals = 2): string {
+  const n = typeof v === "string" ? parseFloat(v) : v;
+  if (isNaN(n)) return "—";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(2)}K`;
+  return n.toFixed(decimals);
+}
+
+function KlineRow({ kline, prev }: { kline: Kline; prev?: Kline }) {
+  const close = parseFloat(kline.close);
+  const prevClose = prev ? parseFloat(prev.close) : close;
+  const isUp = close - prevClose >= 0;
+  return (
+    <TableRow className="text-xs">
+      <TableCell className="text-muted-foreground whitespace-nowrap">
+        {new Date(kline.openTime).toLocaleTimeString()}
+      </TableCell>
+      <TableCell>{formatNum(kline.open)}</TableCell>
+      <TableCell className="text-emerald-600">{formatNum(kline.high)}</TableCell>
+      <TableCell className="text-red-600">{formatNum(kline.low)}</TableCell>
+      <TableCell className={`font-medium ${isUp ? "text-emerald-600" : "text-red-600"}`}>
+        {formatNum(kline.close)}
+      </TableCell>
+      <TableCell className="text-right">{formatNum(kline.volume)}</TableCell>
+    </TableRow>
+  );
+}
+
+const DECISION_CONFIG = {
+  BUY: { icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/10", label: "BUY" },
+  SELL: { icon: XCircle, color: "text-red-600", bg: "bg-red-500/10", label: "SELL" },
+  HOLD: { icon: MinusCircle, color: "text-muted-foreground", bg: "bg-muted", label: "HOLD" },
+} as const;
+
+function parseTickMeta(raw: unknown): TickMetadata | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (!obj.decision || !obj.price) return null;
+  return raw as TickMetadata;
+}
+
+function getLogDecision(log: RunLogEntry): string {
+  if (log.action === "TRADE_BUY") return "BUY";
+  if (log.action === "TRADE_SELL") return "SELL";
+  const tick = parseTickMeta(log.metadata);
+  return tick?.decision ?? "HOLD";
+}
+
+interface DecisionGroup {
+  decision: string;
+  reason: string;
+  position?: string;
+  gridLevel?: string;
+  entries: { id: string; price?: number; time: string }[];
+}
+
+function groupDecisions(logs: RunLogEntry[]): DecisionGroup[] {
+  const groups: DecisionGroup[] = [];
+  for (const log of logs) {
+    const decision = getLogDecision(log);
+    const tick = parseTickMeta(log.metadata);
+    const reason = tick?.reason ?? log.message;
+    const entry = {
+      id: log.id,
+      price: tick?.price,
+      time: log.createdAt,
+    };
+
+    const last = groups[groups.length - 1];
+    if (last && last.decision === decision && last.reason === reason) {
+      last.entries.push(entry);
+    } else {
+      groups.push({
+        decision,
+        reason,
+        position: tick?.position,
+        gridLevel: tick?.gridLevel,
+        entries: [entry],
+      });
+    }
+  }
+  return groups;
+}
+
+// ─── Bot Decisions Feed ──────────────────────────────────────────────────────
+
+function BotDecisionsFeed({ botId, runId, interval, isActive }: { botId: string; runId: string; interval: RunInterval; isActive: boolean }) {
+  const [page, setPage] = useState(1);
+  const { logs, pagination, loading, refetch } = useRunLogs(botId, runId, { page, limit: 30 });
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const pollMs = Math.max(INTERVAL_MS[interval], 3_000);
+
+  useEffect(() => {
+    if (!isActive) return;
+    timerRef.current = setInterval(refetch, pollMs);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isActive, pollMs, refetch]);
+
+  const relevantLogs = logs.filter(
+    (l) => l.action === "TICK" || l.action === "TRADE_BUY" || l.action === "TRADE_SELL"
+  );
+  const displayLogs = relevantLogs.length > 0 ? relevantLogs : logs;
+  const groups = groupDecisions(displayLogs);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Bot Decisions
+              {isActive && <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-amber-500" />}
+            </CardTitle>
+            <CardDescription>
+              Each interval the bot evaluates market conditions and decides whether to execute a trade.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading && groups.length === 0 ? (
+          <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+        ) : groups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Zap className="h-8 w-8 text-muted-foreground" />
+            <p className="mt-2 text-sm font-medium">No decisions yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {isActive
+                ? "Waiting for the bot engine to produce tick data at each interval..."
+                : "Start the run to see the bot's decisions here."}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="max-h-[28rem] space-y-2 overflow-auto">
+              {groups.map((group) => {
+                const cfg = DECISION_CONFIG[group.decision as keyof typeof DECISION_CONFIG] ?? DECISION_CONFIG.HOLD;
+                const Icon = cfg.icon;
+                const latestEntry = group.entries[0];
+                const hasMultiple = group.entries.length > 1;
+
+                return (
+                  <div key={latestEntry.id} className={cn("rounded-lg border p-3", cfg.bg)}>
+                    <div className="flex items-start gap-3">
+                      <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", cfg.color)} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={cn("text-xs", cfg.color)}>{cfg.label}</Badge>
+                          {latestEntry.price != null && (
+                            <span className="text-sm font-semibold">${formatNum(latestEntry.price)}</span>
+                          )}
+                          {hasMultiple && (
+                            <span className="text-xs text-muted-foreground">
+                              &times;{group.entries.length} intervals
+                            </span>
+                          )}
+                          <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
+                            {new Date(latestEntry.time).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">{group.reason}</p>
+                        {group.position && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            Position: <span className="font-medium text-foreground">{group.position}</span>
+                            {group.gridLevel && <> &middot; Grid: <span className="font-medium text-foreground">{group.gridLevel}</span></>}
+                          </p>
+                        )}
+                        {hasMultiple && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {group.entries.map((e) => (
+                              <span
+                                key={e.id}
+                                className="inline-flex items-center gap-1 rounded bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground border"
+                              >
+                                {new Date(e.time).toLocaleTimeString()}
+                                {e.price != null && <span className="font-medium">${formatNum(e.price)}</span>}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {pagination.totalPages > 1 && (
+              <Pagination page={pagination.page} totalPages={pagination.totalPages} onPageChange={setPage} />
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Run Detail View ─────────────────────────────────────────────────────────
 
 function RunDetail({ botId, run, onBack, onStatusChange }: { botId: string; run: RunResponse; onBack: () => void; onStatusChange: () => void }) {
@@ -196,6 +399,11 @@ function RunDetail({ botId, run, onBack, onStatusChange }: { botId: string; run:
   const [logsPage, setLogsPage] = useState(1);
   const { logs, pagination: logsPagination, loading: logsLoading } = useRunLogs(botId, run.id, { page: logsPage, limit: 10 });
   const [actionLoading, setActionLoading] = useState(false);
+  const isRunActive = run.status === "RUNNING" || run.status === "PAUSED";
+  const runInterval = run.interval as RunInterval;
+  const { data: marketData, loading: marketLoading, error: marketError } = useMarketData(
+    botId, run.id, runInterval, isRunActive
+  );
 
   const handleAction = async (status: string) => {
     if (!accessToken) return;
@@ -232,7 +440,7 @@ function RunDetail({ botId, run, onBack, onStatusChange }: { botId: string; run:
               <RunStatusBadge status={run.status} />
             </div>
             <p className="text-sm text-muted-foreground">
-              Interval: {INTERVAL_LABELS[run.interval as RunInterval]} &middot; Started {run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}
+              Interval: {INTERVAL_LABELS[runInterval]} &middot; Started {run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}
             </p>
           </div>
         </div>
@@ -290,6 +498,81 @@ function RunDetail({ botId, run, onBack, onStatusChange }: { botId: string; run:
         </Card>
       </div>
 
+      {/* Bot Decisions */}
+      <BotDecisionsFeed botId={botId} runId={run.id} interval={runInterval} isActive={isRunActive} />
+
+      {/* Live Market Data */}
+      {isRunActive && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                Live Market Data
+                {marketData && <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-emerald-500" />}
+              </CardTitle>
+              {marketData && (
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="text-2xl font-bold">${formatNum(marketData.lastPrice, 2)}</span>
+                  <span className={`font-medium ${parseFloat(marketData.priceChangePercent) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    {parseFloat(marketData.priceChangePercent) >= 0 ? "+" : ""}{parseFloat(marketData.priceChangePercent).toFixed(2)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {marketLoading ? (
+              <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+            ) : marketError ? (
+              <p className="py-4 text-center text-sm text-destructive">{marketError}</p>
+            ) : marketData ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+                  <div>
+                    <p className="text-muted-foreground">24h Open</p>
+                    <p className="font-medium">${formatNum(marketData.openPrice)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">24h High</p>
+                    <p className="font-medium text-emerald-600">${formatNum(marketData.highPrice)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">24h Low</p>
+                    <p className="font-medium text-red-600">${formatNum(marketData.lowPrice)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">24h Volume</p>
+                    <p className="font-medium">{formatNum(marketData.quoteVolume)} USDT</p>
+                  </div>
+                </div>
+                <div className="max-h-80 overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="text-xs">
+                        <TableHead>Time</TableHead>
+                        <TableHead>Open</TableHead>
+                        <TableHead>High</TableHead>
+                        <TableHead>Low</TableHead>
+                        <TableHead>Close</TableHead>
+                        <TableHead className="text-right">Volume</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...marketData.klines].reverse().map((kline, i, arr) => (
+                        <KlineRow key={kline.openTime} kline={kline} prev={arr[i + 1]} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <p className="text-xs text-muted-foreground text-right">
+                  Updated {new Date(marketData.fetchedAt).toLocaleTimeString()} &middot; Refreshes every {INTERVAL_LABELS[runInterval]}
+                </p>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Chart placeholder */}
       <Card>
         <CardHeader><CardTitle>Performance Chart</CardTitle></CardHeader>
@@ -331,21 +614,55 @@ function RunDetail({ botId, run, onBack, onStatusChange }: { botId: string; run:
 
 // ─── Runs Tab ────────────────────────────────────────────────────────────────
 
-function RunsTab({ botId, onStartRun }: { botId: string; onStartRun: () => void }) {
+function RunsTab({
+  botId,
+  onStartRun,
+  selectedRunId,
+  onSelectRun,
+}: {
+  botId: string;
+  onStartRun: () => void;
+  selectedRunId: string | null;
+  onSelectRun: (runId: string | null) => void;
+}) {
   const { accessToken } = useAuth();
   const [runsPage, setRunsPage] = useState(1);
   const { runs, pagination, loading, refetch } = useRuns(botId, { page: runsPage, limit: 10 });
+  const { run: fetchedRun, loading: runLoading } = useRun(botId, selectedRunId);
   const [selectedRun, setSelectedRun] = useState<RunResponse | null>(null);
+
+  useEffect(() => {
+    if (fetchedRun) setSelectedRun(fetchedRun);
+  }, [fetchedRun]);
+
+  const selectRun = useCallback(
+    (run: RunResponse | null) => {
+      setSelectedRun(run);
+      onSelectRun(run?.id ?? null);
+    },
+    [onSelectRun]
+  );
+
+  if (selectedRunId && runLoading && !selectedRun) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
+        </div>
+      </div>
+    );
+  }
 
   if (selectedRun) {
     return (
       <RunDetail
         botId={botId}
         run={selectedRun}
-        onBack={() => { setSelectedRun(null); refetch(); }}
+        onBack={() => { selectRun(null); refetch(); }}
         onStatusChange={() => {
           refetch();
-          if (accessToken) {
+          if (accessToken && selectedRun) {
             apiFetch<RunResponse>(`/bots/${botId}/runs/${selectedRun.id}`, {
               headers: { Authorization: `Bearer ${accessToken}` },
             }).then(setSelectedRun).catch(() => {});
@@ -405,7 +722,7 @@ function RunsTab({ botId, onStartRun }: { botId: string; onStartRun: () => void 
                     {run.startedAt ? new Date(run.startedAt).toLocaleDateString() : "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedRun(run)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => selectRun(run)}>
                       <Eye className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -422,14 +739,42 @@ function RunsTab({ botId, onStartRun }: { botId: string; onStartRun: () => void 
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
+const TABS = ["overview", "runs"] as const;
+type Tab = (typeof TABS)[number];
+
 export default function BotDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { accessToken } = useAuth();
   const { bot, loading, refetch } = useBot(params.id);
   const [showDelete, setShowDelete] = useState(false);
   const [showStartRun, setShowStartRun] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "runs">("overview");
+
+  const tabFromUrl = searchParams.get("tab") as Tab | null;
+  const activeTab: Tab = tabFromUrl && TABS.includes(tabFromUrl) ? tabFromUrl : "overview";
+  const runIdFromUrl = searchParams.get("run");
+
+  const updateUrl = useCallback(
+    (tab: Tab, runId?: string | null) => {
+      const newParams = new URLSearchParams();
+      if (tab !== "overview") newParams.set("tab", tab);
+      if (runId) newParams.set("run", runId);
+      const qs = newParams.toString();
+      router.replace(`/bots/${params.id}${qs ? `?${qs}` : ""}`, { scroll: false });
+    },
+    [router, params.id]
+  );
+
+  const setActiveTab = useCallback(
+    (tab: Tab) => updateUrl(tab, tab === "runs" ? runIdFromUrl : null),
+    [updateUrl, runIdFromUrl]
+  );
+
+  const setSelectedRunId = useCallback(
+    (runId: string | null) => updateUrl("runs", runId),
+    [updateUrl]
+  );
 
   const handleDelete = async () => {
     if (!accessToken) return;
@@ -494,7 +839,7 @@ export default function BotDetailPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b">
-        {(["overview", "runs"] as const).map((tab) => (
+        {TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -512,10 +857,22 @@ export default function BotDetailPage() {
 
       {/* Tab content */}
       {activeTab === "overview" && <OverviewTab bot={bot} />}
-      {activeTab === "runs" && <RunsTab botId={bot.id} onStartRun={() => setShowStartRun(true)} />}
+      {activeTab === "runs" && (
+        <RunsTab
+          botId={bot.id}
+          onStartRun={() => setShowStartRun(true)}
+          selectedRunId={runIdFromUrl}
+          onSelectRun={setSelectedRunId}
+        />
+      )}
 
       <DeleteBotDialog open={showDelete} onOpenChange={setShowDelete} botName={bot.name} onConfirm={handleDelete} />
-      <StartRunDialog botId={bot.id} open={showStartRun} onOpenChange={setShowStartRun} onCreated={() => { refetch(); setActiveTab("runs"); }} />
+      <StartRunDialog
+        botId={bot.id}
+        open={showStartRun}
+        onOpenChange={setShowStartRun}
+        onCreated={() => { refetch(); setActiveTab("runs"); }}
+      />
     </div>
   );
 }

@@ -30,6 +30,7 @@ export const runLogAction = z.enum([
   "TRADE_BUY",
   "TRADE_SELL",
   "CONFIG_CHANGE",
+  "TICK",
 ]);
 export type RunLogAction = z.infer<typeof runLogAction>;
 
@@ -46,6 +47,48 @@ export const INTERVAL_LABELS: Record<RunInterval, string> = {
   FOUR_HOURS: "4h",
   ONE_DAY: "1d",
 };
+
+export const INTERVAL_MS: Record<RunInterval, number> = {
+  ONE_SECOND: 1_000,
+  FIVE_SECONDS: 5_000,
+  FIFTEEN_SECONDS: 15_000,
+  THIRTY_SECONDS: 30_000,
+  ONE_MINUTE: 60_000,
+  FIVE_MINUTES: 300_000,
+  FIFTEEN_MINUTES: 900_000,
+  THIRTY_MINUTES: 1_800_000,
+  ONE_HOUR: 3_600_000,
+  FOUR_HOURS: 14_400_000,
+  ONE_DAY: 86_400_000,
+};
+
+export const klineSchema = z.object({
+  openTime: z.number(),
+  open: z.string(),
+  high: z.string(),
+  low: z.string(),
+  close: z.string(),
+  volume: z.string(),
+  closeTime: z.number(),
+  quoteVolume: z.string(),
+  trades: z.number(),
+});
+export type Kline = z.infer<typeof klineSchema>;
+
+export const marketDataResponse = z.object({
+  symbol: z.string(),
+  lastPrice: z.string(),
+  priceChange: z.string(),
+  priceChangePercent: z.string(),
+  highPrice: z.string(),
+  lowPrice: z.string(),
+  volume: z.string(),
+  quoteVolume: z.string(),
+  openPrice: z.string(),
+  klines: z.array(klineSchema),
+  fetchedAt: z.string(),
+});
+export type MarketDataResponse = z.infer<typeof marketDataResponse>;
 
 export const TOP_MARKET_PAIRS = [
   "BTC/USDT",
@@ -89,6 +132,19 @@ export const updateRunStatusBody = z.object({
   status: z.enum(["RUNNING", "PAUSED", "STOPPED"]),
 });
 export type UpdateRunStatusBody = z.infer<typeof updateRunStatusBody>;
+
+export const tickDecision = z.enum(["BUY", "SELL", "HOLD"]);
+export type TickDecision = z.infer<typeof tickDecision>;
+
+export const tickMetadata = z.object({
+  price: z.number(),
+  decision: tickDecision,
+  reason: z.string(),
+  position: z.string().optional(),
+  gridLevel: z.string().optional(),
+  confidence: z.number().optional(),
+});
+export type TickMetadata = z.infer<typeof tickMetadata>;
 
 // --- Response schemas ---
 

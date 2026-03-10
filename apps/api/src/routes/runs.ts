@@ -6,8 +6,10 @@ import {
   updateRunStatusBody,
   runListQuery,
   runLogListQuery,
+  type RunInterval,
 } from "@repo/shared";
 import type { Prisma } from "@prisma/client";
+import { fetchKlines, fetchTicker, toSymbol } from "../lib/binance.js";
 
 function serializeDate(d: Date): string {
   return d.toISOString();
@@ -282,6 +284,52 @@ export async function runRoutes(fastify: FastifyInstance) {
         })),
         pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
       };
+    }
+  );
+
+  // GET /bots/:botId/runs/:runId/market - live market data from Binance
+  fastify.get(
+    "/bots/:botId/runs/:runId/market",
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const req = request as AuthenticatedRequest;
+      const { botId, runId } = request.params as { botId: string; runId: string };
+
+      const bot = await prisma.bot.findUnique({ where: { id: botId } });
+      if (!bot || bot.userId !== req.user.id) {
+        return reply.status(404).send({ error: "Bot not found" });
+      }
+
+      const run = await prisma.botRun.findUnique({ where: { id: runId } });
+      if (!run || run.botId !== botId) {
+        return reply.status(404).send({ error: "Run not found" });
+      }
+
+      try {
+        const symbol = toSymbol(run.marketPair);
+        const [klines, ticker] = await Promise.all([
+          fetchKlines(symbol, run.interval as RunInterval, 30),
+          fetchTicker(symbol),
+        ]);
+
+        return {
+          symbol,
+          lastPrice: ticker.lastPrice,
+          priceChange: ticker.priceChange,
+          priceChangePercent: ticker.priceChangePercent,
+          highPrice: ticker.highPrice,
+          lowPrice: ticker.lowPrice,
+          volume: ticker.volume,
+          quoteVolume: ticker.quoteVolume,
+          openPrice: ticker.openPrice,
+          klines,
+          fetchedAt: new Date().toISOString(),
+        };
+      } catch (e) {
+        return reply.status(502).send({
+          error: e instanceof Error ? e.message : "Failed to fetch market data",
+        });
+      }
     }
   );
 }

@@ -176,6 +176,39 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // Validates refresh token WITHOUT rotating it — safe for server-side rendering
+  fastify.post(
+    "/auth/verify",
+    { config: { rateLimit: authRateLimit } },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const token = request.cookies[REFRESH_COOKIE];
+      if (!token) {
+        return reply.status(401).send({ error: "No refresh token" });
+      }
+
+      const tokens = await prisma.refreshToken.findMany({
+        where: { revokedAt: null, expiresAt: { gt: new Date() } },
+        include: { user: true },
+      });
+
+      for (const rt of tokens) {
+        const valid = await verifyRefreshTokenHash(rt.tokenHash, token);
+        if (valid) {
+          const accessToken = await signAccessToken({
+            sub: rt.user.id,
+            email: rt.user.email,
+          });
+          return reply.send({
+            user: userToJson(rt.user),
+            accessToken,
+          });
+        }
+      }
+
+      return reply.status(401).send({ error: "Invalid or expired refresh token" });
+    }
+  );
+
   fastify.post(
     "/auth/logout",
     { config: { rateLimit: authRateLimit } },
