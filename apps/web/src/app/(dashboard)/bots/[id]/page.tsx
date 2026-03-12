@@ -30,7 +30,7 @@ import { apiFetch } from "@/lib/api";
 import { useBot, useBotLogs } from "@/hooks/use-bots";
 import { useRuns, useRun, useRunLogs } from "@/hooks/use-runs";
 import { useMarketData } from "@/hooks/use-market-data";
-import { INTERVAL_LABELS, INTERVAL_MS } from "@repo/shared";
+import { INTERVAL_LABELS, INTERVAL_MS, DURATION_LABELS } from "@repo/shared";
 import type { RunResponse, RunInterval, Kline, TickMetadata, RunLogEntry } from "@repo/shared";
 
 import { Button } from "@/components/ui/button";
@@ -440,7 +440,7 @@ function RunDetail({ botId, run, onBack, onStatusChange }: { botId: string; run:
               <RunStatusBadge status={run.status} />
             </div>
             <p className="text-sm text-muted-foreground">
-              Interval: {INTERVAL_LABELS[runInterval]} &middot; Started {run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}
+              Interval: {INTERVAL_LABELS[runInterval]} &middot; Duration: {DURATION_LABELS[run.durationHours] ?? `${run.durationHours}h`} &middot; Started {run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}
             </p>
           </div>
         </div>
@@ -698,6 +698,7 @@ function RunsTab({
                 <TableHead>Exchange</TableHead>
                 <TableHead>Pair</TableHead>
                 <TableHead>Interval</TableHead>
+                <TableHead>Duration</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">PnL</TableHead>
                 <TableHead className="text-right">Trades</TableHead>
@@ -711,6 +712,7 @@ function RunsTab({
                   <TableCell>{run.exchange}</TableCell>
                   <TableCell className="font-medium">{run.marketPair}</TableCell>
                   <TableCell>{INTERVAL_LABELS[run.interval as RunInterval]}</TableCell>
+                  <TableCell>{DURATION_LABELS[run.durationHours] ?? `${run.durationHours}h`}</TableCell>
                   <TableCell><RunStatusBadge status={run.status} /></TableCell>
                   <TableCell className="text-right">
                     <span className={run.stats.netPnl > 0 ? "text-emerald-600" : run.stats.netPnl < 0 ? "text-red-600" : ""}>

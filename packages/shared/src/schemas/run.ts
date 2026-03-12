@@ -113,6 +113,20 @@ export const TOP_MARKET_PAIRS = [
   "NEAR/USDT",
 ];
 
+export const DURATION_OPTIONS = [1, 2, 4, 6, 8, 12, 16, 24] as const;
+export type DurationHours = (typeof DURATION_OPTIONS)[number];
+
+export const DURATION_LABELS: Record<number, string> = {
+  1: "1 hour",
+  2: "2 hours",
+  4: "4 hours",
+  6: "6 hours",
+  8: "8 hours",
+  12: "12 hours",
+  16: "16 hours",
+  24: "24 hours",
+};
+
 // --- Create run ---
 
 export const createRunBody = z.object({
@@ -123,6 +137,7 @@ export const createRunBody = z.object({
     .max(20)
     .transform((v) => v.replace("/", "").toUpperCase()),
   interval: runInterval,
+  durationHours: z.number().int().min(1).max(24),
 });
 export type CreateRunBody = z.infer<typeof createRunBody>;
 
@@ -167,6 +182,7 @@ export const runResponseSchema = z.object({
   exchange: apiProvider,
   marketPair: z.string(),
   interval: runInterval,
+  durationHours: z.number(),
   status: runStatus,
   startedAt: z.string().nullable(),
   stoppedAt: z.string().nullable(),
@@ -190,6 +206,30 @@ export const runListQuery = z.object({
   status: runStatus.optional(),
 });
 export type RunListQuery = z.infer<typeof runListQuery>;
+
+// --- All runs (cross-bot) ---
+
+export const allRunsListQuery = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+  status: runStatus.optional(),
+  search: z.string().optional(),
+  strategy: z.enum(["GRID"]).optional(),
+  exchange: apiProvider.optional(),
+});
+export type AllRunsListQuery = z.infer<typeof allRunsListQuery>;
+
+export const allRunsItemSchema = runResponseSchema.extend({
+  botName: z.string(),
+  botStrategy: z.string(),
+});
+export type AllRunsItem = z.infer<typeof allRunsItemSchema>;
+
+export const allRunsListResponse = z.object({
+  items: z.array(allRunsItemSchema),
+  pagination: paginationMeta,
+});
+export type AllRunsListResponse = z.infer<typeof allRunsListResponse>;
 
 // --- Log schemas ---
 

@@ -6,6 +6,7 @@ import {
   updateRunStatusBody,
   runListQuery,
   runLogListQuery,
+  allRunsListQuery,
   type RunInterval,
 } from "@repo/shared";
 import type { Prisma } from "@prisma/client";
@@ -22,6 +23,7 @@ function serializeRun(run: any) {
     exchange: run.exchange,
     marketPair: run.marketPair,
     interval: run.interval,
+    durationHours: run.durationHours,
     status: run.status,
     startedAt: run.startedAt ? serializeDate(run.startedAt) : null,
     stoppedAt: run.stoppedAt ? serializeDate(run.stoppedAt) : null,
@@ -99,7 +101,7 @@ export async function runRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: "Validation failed", details: parsed.error.flatten() });
       }
 
-      const { exchange, marketPair, interval } = parsed.data;
+      const { exchange, marketPair, interval, durationHours } = parsed.data;
 
       const apiKey = await prisma.apiKey.findUnique({
         where: { userId_provider: { userId: req.user.id, provider: exchange } },
@@ -114,6 +116,7 @@ export async function runRoutes(fastify: FastifyInstance) {
           exchange,
           marketPair,
           interval,
+          durationHours,
           status: "RUNNING",
           startedAt: new Date(),
         },
@@ -281,6 +284,54 @@ export async function runRoutes(fastify: FastifyInstance) {
           message: log.message,
           metadata: log.metadata,
           createdAt: serializeDate(log.createdAt),
+        })),
+        pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      };
+    }
+  );
+
+  // GET /runs - list all runs for the authenticated user (cross-bot)
+  fastify.get(
+    "/runs",
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const req = request as AuthenticatedRequest;
+      const parsed = allRunsListQuery.safeParse(request.query);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: "Invalid query", details: parsed.error.flatten() });
+      }
+
+      const { page, limit, status, search, strategy, exchange } = parsed.data;
+
+      const where: Prisma.BotRunWhereInput = {
+        bot: { userId: req.user.id },
+      };
+      if (status) where.status = status;
+      if (exchange) where.exchange = exchange;
+      if (strategy) where.bot = { ...where.bot as any, strategy };
+      if (search) {
+        where.bot = {
+          ...where.bot as any,
+          name: { contains: search, mode: "insensitive" },
+        };
+      }
+
+      const [items, total] = await Promise.all([
+        prisma.botRun.findMany({
+          where,
+          include: { bot: { select: { name: true, strategy: true } } },
+          orderBy: { createdAt: "desc" },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.botRun.count({ where }),
+      ]);
+
+      return {
+        items: items.map((run) => ({
+          ...serializeRun(run),
+          botName: run.bot.name,
+          botStrategy: run.bot.strategy,
         })),
         pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
       };

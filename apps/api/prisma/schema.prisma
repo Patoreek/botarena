@@ -188,16 +188,17 @@ model BotLog {
 }
 
 model BotRun {
-  id          String      @id @default(cuid())
-  botId       String      @map("bot_id")
-  exchange    ApiProvider
-  marketPair  String      @map("market_pair")
-  interval    RunInterval
-  status      RunStatus   @default(PENDING)
-  startedAt   DateTime?   @map("started_at")
-  stoppedAt   DateTime?   @map("stopped_at")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  id            String      @id @default(cuid())
+  botId         String      @map("bot_id")
+  exchange      ApiProvider
+  marketPair    String      @map("market_pair")
+  interval      RunInterval
+  durationHours Int         @default(1) @map("duration_hours")
+  status        RunStatus   @default(PENDING)
+  startedAt     DateTime?   @map("started_at")
+  stoppedAt     DateTime?   @map("stopped_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
 
   totalProfit   Float @default(0) @map("total_profit")
   totalLoss     Float @default(0) @map("total_loss")

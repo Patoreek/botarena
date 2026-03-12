@@ -7,6 +7,8 @@ import type {
   RunResponse,
   RunListResponse,
   RunLogListResponse,
+  AllRunsListResponse,
+  AllRunsItem,
   PaginationMeta,
   RunLogEntry,
 } from "@repo/shared";
@@ -106,4 +108,48 @@ export function useRunLogs(botId: string, runId: string | null, params?: { page?
   }, [fetch]);
 
   return { logs, pagination, loading, refetch: fetch };
+}
+
+export function useAllRuns(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+  strategy?: string;
+  exchange?: string;
+}) {
+  const { accessToken } = useAuth();
+  const [runs, setRuns] = useState<AllRunsItem[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta>(defaultPagination);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    if (!accessToken) return;
+    setLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set("page", String(params.page));
+      if (params?.limit) qs.set("limit", String(params.limit));
+      if (params?.status) qs.set("status", params.status);
+      if (params?.search) qs.set("search", params.search);
+      if (params?.strategy) qs.set("strategy", params.strategy);
+      if (params?.exchange) qs.set("exchange", params.exchange);
+      const data = await apiFetch<AllRunsListResponse>(
+        `/runs?${qs.toString()}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      setRuns(data.items);
+      setPagination(data.pagination);
+    } catch {
+      setRuns([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken, params?.page, params?.limit, params?.status, params?.search, params?.strategy, params?.exchange]);
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { runs, pagination, loading, refetch: fetch };
 }

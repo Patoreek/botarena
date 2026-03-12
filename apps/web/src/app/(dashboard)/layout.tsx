@@ -34,6 +34,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
             Bots
           </Link>
           <Link
+            href="/runs"
+            className="rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+          >
+            Runs
+          </Link>
+          <Link
             href="/settings/profile"
             className="rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
           >

@@ -7,6 +7,8 @@ import { apiFetch } from "@/lib/api";
 import { useApiKeys } from "@/hooks/use-api-keys";
 import {
   INTERVAL_LABELS,
+  DURATION_OPTIONS,
+  DURATION_LABELS,
   TOP_MARKET_PAIRS,
   type RunInterval,
   type ApiProvider,
@@ -57,6 +59,7 @@ export function StartRunDialog({ botId, open, onOpenChange, onCreated }: StartRu
   const [selectedPair, setSelectedPair] = useState<string>("");
   const [customPair, setCustomPair] = useState("");
   const [interval, setInterval] = useState<string>("ONE_MINUTE");
+  const [durationHours, setDurationHours] = useState<string>("1");
   const [submitting, setSubmitting] = useState(false);
 
   const exchangeKeys = keys.filter((k) =>
@@ -76,7 +79,7 @@ export function StartRunDialog({ botId, open, onOpenChange, onCreated }: StartRu
       await apiFetch<RunResponse>(`/bots/${botId}/runs`, {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ exchange, marketPair, interval }),
+        body: JSON.stringify({ exchange, marketPair, interval, durationHours: Number(durationHours) }),
       });
       toast.success("Run started");
       onOpenChange(false);
@@ -95,6 +98,7 @@ export function StartRunDialog({ botId, open, onOpenChange, onCreated }: StartRu
     setSelectedPair("");
     setCustomPair("");
     setInterval("ONE_MINUTE");
+    setDurationHours("1");
   };
 
   return (
@@ -187,6 +191,25 @@ export function StartRunDialog({ botId, open, onOpenChange, onCreated }: StartRu
                 {INTERVALS.map((i) => (
                   <SelectItem key={i.value} value={i.value}>
                     {i.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          {/* Duration */}
+          <div className="space-y-2">
+            <Label>Run Duration</Label>
+            <Select value={durationHours} onValueChange={setDurationHours}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DURATION_OPTIONS.map((h) => (
+                  <SelectItem key={h} value={String(h)}>
+                    {DURATION_LABELS[h]}
                   </SelectItem>
                 ))}
               </SelectContent>
