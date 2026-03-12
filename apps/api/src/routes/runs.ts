@@ -11,6 +11,8 @@ import {
 } from "@repo/shared";
 import type { Prisma } from "@prisma/client";
 import { fetchKlines, fetchTicker, toSymbol } from "../lib/binance.js";
+import { runManager } from "../lib/engine/manager.js";
+import type { GridConfig } from "../lib/engine/grid.js";
 
 function serializeDate(d: Date): string {
   return d.toISOString();
@@ -135,6 +137,32 @@ export async function runRoutes(fastify: FastifyInstance) {
         data: { status: "RUNNING" },
       });
 
+      // Start the bot engine if bot has a grid config
+      const gridConfig = await prisma.gridStrategyConfig.findUnique({
+        where: { botId },
+      });
+      if (gridConfig) {
+        const engineConfig: GridConfig = {
+          upperPrice: gridConfig.upperPrice,
+          lowerPrice: gridConfig.lowerPrice,
+          gridCount: gridConfig.gridCount,
+          gridType: gridConfig.gridType as "ARITHMETIC" | "GEOMETRIC",
+          gridMode: gridConfig.gridMode as "LONG" | "SHORT" | "NEUTRAL",
+          amountPerGrid: gridConfig.amountPerGrid,
+          totalInvestment: gridConfig.totalInvestment,
+          minProfitPerGrid: gridConfig.minProfitPerGrid ?? undefined,
+          maxOpenOrders: gridConfig.maxOpenOrders ?? undefined,
+        };
+        runManager.start({
+          runId: run.id,
+          botId,
+          marketPair: run.marketPair,
+          interval: interval as RunInterval,
+          gridConfig: engineConfig,
+          durationMs: 60 * 60 * 1000, // 1 hour default
+        });
+      }
+
       return reply.status(201).send(serializeRun(run));
     }
   );
@@ -226,6 +254,15 @@ export async function runRoutes(fastify: FastifyInstance) {
           message: messageMap[status],
         },
       });
+
+      // Control the engine
+      if (status === "PAUSED") {
+        runManager.pause(runId);
+      } else if (status === "RUNNING" && existing.status === "PAUSED") {
+        runManager.resume(runId);
+      } else if (status === "STOPPED") {
+        await runManager.stop(runId);
+      }
 
       const activeRuns = await prisma.botRun.count({
         where: { botId, status: { in: ["RUNNING", "PAUSED"] } },
