@@ -159,7 +159,7 @@ export async function runRoutes(fastify: FastifyInstance) {
           marketPair: run.marketPair,
           interval: interval as RunInterval,
           gridConfig: engineConfig,
-          durationMs: 60 * 60 * 1000, // 1 hour default
+          durationMs: (durationHours ?? 1) * 60 * 60 * 1000,
         });
       }
 

@@ -7,6 +7,117 @@ const prisma = new PrismaClient();
 const TEST_EMAIL = "testing@gmail.com";
 const TEST_PASSWORD = "Testing123!";
 
+/**
+ * Three DOGE/USDT grid bots with very different strategies:
+ *
+ * 1) "DOGE Scalper" — Tight grid, 5s ticks, NEUTRAL, aims for many rapid trades
+ * 2) "DOGE Trend Rider" — Wider grid, LONG-biased, fewer but larger moves
+ * 3) "DOGE Contrarian" — SHORT-biased, geometric grid, sells into rallies
+ *
+ * DOGE is ~$0.093 right now (24h range: $0.090 – $0.100).
+ */
+
+interface BotSeed {
+  name: string;
+  grid: {
+    upperPrice: number;
+    lowerPrice: number;
+    gridCount: number;
+    gridType: "ARITHMETIC" | "GEOMETRIC";
+    gridMode: "LONG" | "SHORT" | "NEUTRAL";
+    orderType: "LIMIT" | "MARKET";
+    totalInvestment: number;
+    amountPerGrid: number;
+    minProfitPerGrid: number | null;
+    maxOpenOrders: number | null;
+    triggerPrice: number | null;
+    stopLossPrice: number | null;
+    takeProfitPrice: number | null;
+    trailingUp: boolean;
+    trailingDown: boolean;
+    stopLossAction: "CLOSE_ALL" | "STOP_ONLY";
+    takeProfitAction: "CLOSE_ALL" | "STOP_ONLY";
+  };
+}
+
+const bots: BotSeed[] = [
+  {
+    // ── Bot 1: Tight scalper ──────────────────────────────────────────────
+    // Very narrow range around current price, 30 levels = tiny ~$0.00033 gap
+    // NEUTRAL mode: buys dips + sells rallies. No min profit → trades constantly.
+    name: "DOGE Scalper (Sandbox)",
+    grid: {
+      upperPrice: 0.1,
+      lowerPrice: 0.085,
+      gridCount: 30,
+      gridType: "ARITHMETIC",
+      gridMode: "NEUTRAL",
+      orderType: "MARKET",
+      totalInvestment: 300,
+      amountPerGrid: 80, // ~80 DOGE per grid ≈ $7.44
+      minProfitPerGrid: null, // trade at any micro-move
+      maxOpenOrders: null,
+      triggerPrice: null,
+      stopLossPrice: 0.075, // stop-loss 19% below
+      takeProfitPrice: 0.115, // take-profit 24% above
+      trailingUp: false,
+      trailingDown: false,
+      stopLossAction: "STOP_ONLY",
+      takeProfitAction: "STOP_ONLY",
+    },
+  },
+  {
+    // ── Bot 2: LONG Trend Rider ───────────────────────────────────────────
+    // Wider range, LONG mode = only buys. Accumulates on dips, holds.
+    // 15 grid levels, geometric spacing (wider at the top, tighter at bottom).
+    name: "DOGE Trend Rider (Sandbox)",
+    grid: {
+      upperPrice: 0.105,
+      lowerPrice: 0.08,
+      gridCount: 15,
+      gridType: "GEOMETRIC",
+      gridMode: "LONG",
+      orderType: "MARKET",
+      totalInvestment: 500,
+      amountPerGrid: 150, // ~150 DOGE per grid ≈ $14
+      minProfitPerGrid: null,
+      maxOpenOrders: 10,
+      triggerPrice: null,
+      stopLossPrice: 0.07,
+      takeProfitPrice: 0.12,
+      trailingUp: true,
+      trailingDown: false,
+      stopLossAction: "CLOSE_ALL",
+      takeProfitAction: "STOP_ONLY",
+    },
+  },
+  {
+    // ── Bot 3: SHORT Contrarian ───────────────────────────────────────────
+    // SHORT mode = sells positions into rallies. Tight grid, aggressive.
+    // This bot will frequently sell at small losses when price drops after buying.
+    name: "DOGE Contrarian (Sandbox)",
+    grid: {
+      upperPrice: 0.098,
+      lowerPrice: 0.088,
+      gridCount: 25,
+      gridType: "ARITHMETIC",
+      gridMode: "NEUTRAL", // uses NEUTRAL so it buys AND sells
+      orderType: "MARKET",
+      totalInvestment: 250,
+      amountPerGrid: 60, // ~60 DOGE per grid ≈ $5.58
+      minProfitPerGrid: null, // no minimum profit → sells even at a loss
+      maxOpenOrders: null,
+      triggerPrice: null,
+      stopLossPrice: null, // no stop-loss: let it trade recklessly
+      takeProfitPrice: null,
+      trailingUp: false,
+      trailingDown: false,
+      stopLossAction: "STOP_ONLY",
+      takeProfitAction: "STOP_ONLY",
+    },
+  },
+];
+
 async function main() {
   // 1. Upsert test user
   const passwordHash = await hashPassword(TEST_PASSWORD);
@@ -40,71 +151,71 @@ async function main() {
   });
   console.log("Binance API key (sandbox) ready");
 
-  // 3. Create aggressive grid bot for DOGE/USDT
-  //
-  // DOGE is ~$0.092 right now. We set a tight grid to maximize trades:
-  //   - Range: $0.085 – $0.100 (~8% spread around current price)
-  //   - 20 grid levels (~$0.00075 per level)
-  //   - NEUTRAL mode (both buy and sell)
-  //   - MARKET order type
-  //   - No min profit per grid (trades at any micro-movement)
-  //   - $200 paper investment, ~$10 per grid
-  //
-  const BOT_NAME = "DOGE Scalper (Sandbox)";
+  // 3. Create all three bots
+  const createdBots: { id: string; name: string }[] = [];
 
-  // Delete existing bot with same name to allow re-seeding
-  const existing = await prisma.bot.findFirst({
-    where: { userId: user.id, name: BOT_NAME },
-  });
-  if (existing) {
-    await prisma.bot.delete({ where: { id: existing.id } });
-    console.log("Deleted previous bot:", BOT_NAME);
+  for (const botSeed of bots) {
+    // Delete existing bot with same name to allow re-seeding
+    const existing = await prisma.bot.findFirst({
+      where: { userId: user.id, name: botSeed.name },
+    });
+    if (existing) {
+      await prisma.bot.delete({ where: { id: existing.id } });
+      console.log("  Deleted previous bot:", botSeed.name);
+    }
+
+    const bot = await prisma.bot.create({
+      data: {
+        userId: user.id,
+        name: botSeed.name,
+        strategy: "GRID",
+        status: "IDLE",
+      },
+    });
+
+    await prisma.gridStrategyConfig.create({
+      data: {
+        botId: bot.id,
+        upperPrice: botSeed.grid.upperPrice,
+        lowerPrice: botSeed.grid.lowerPrice,
+        gridCount: botSeed.grid.gridCount,
+        gridType: botSeed.grid.gridType,
+        gridMode: botSeed.grid.gridMode,
+        orderType: botSeed.grid.orderType,
+        totalInvestment: botSeed.grid.totalInvestment,
+        amountPerGrid: botSeed.grid.amountPerGrid,
+        trailingUp: botSeed.grid.trailingUp,
+        trailingDown: botSeed.grid.trailingDown,
+        stopLossAction: botSeed.grid.stopLossAction,
+        takeProfitAction: botSeed.grid.takeProfitAction,
+        minProfitPerGrid: botSeed.grid.minProfitPerGrid,
+        maxOpenOrders: botSeed.grid.maxOpenOrders,
+        triggerPrice: botSeed.grid.triggerPrice,
+        stopLossPrice: botSeed.grid.stopLossPrice,
+        takeProfitPrice: botSeed.grid.takeProfitPrice,
+      },
+    });
+
+    await prisma.botStats.create({
+      data: { botId: bot.id },
+    });
+
+    createdBots.push({ id: bot.id, name: botSeed.name });
+    console.log(`  ✔ Bot created: "${botSeed.name}" (${bot.id})`);
   }
 
-  const bot = await prisma.bot.create({
-    data: {
-      userId: user.id,
-      name: BOT_NAME,
-      strategy: "GRID",
-      status: "IDLE",
-    },
-  });
-
-  await prisma.gridStrategyConfig.create({
-    data: {
-      botId: bot.id,
-      upperPrice: 0.1,
-      lowerPrice: 0.085,
-      gridCount: 20,
-      gridType: "ARITHMETIC",
-      gridMode: "NEUTRAL",
-      orderType: "MARKET",
-      totalInvestment: 200,
-      amountPerGrid: 100, // ~100 DOGE per grid (~$9.2 per order)
-      trailingUp: false,
-      trailingDown: false,
-      stopLossAction: "STOP_ONLY",
-      takeProfitAction: "STOP_ONLY",
-      minProfitPerGrid: null,
-      maxOpenOrders: null,
-      triggerPrice: null,
-      stopLossPrice: null,
-      takeProfitPrice: null,
-    },
-  });
-
-  await prisma.botStats.create({
-    data: { botId: bot.id },
-  });
-
-  console.log(`\nBot created: "${BOT_NAME}" (${bot.id})`);
-  console.log("Grid config: DOGE/USDT, $0.085 - $0.100, 20 levels, NEUTRAL, MARKET");
-  console.log("Investment: $200 paper money, ~100 DOGE per grid level");
-  console.log("\nTo start a run:");
+  console.log("\n══════════════════════════════════════════════════════════");
+  console.log("  3 DOGE/USDT grid bots ready for paper trading");
+  console.log("══════════════════════════════════════════════════════════");
+  console.log("\nBots:");
+  for (const b of createdBots) {
+    console.log(`  • ${b.name} (${b.id})`);
+  }
+  console.log("\nTo start all bots:");
   console.log("  1. Login at http://localhost:3000 with testing@gmail.com / Testing123!");
-  console.log("  2. Go to Bots > DOGE Scalper > Start Run");
-  console.log("  3. Select: Exchange=BINANCE, Pair=DOGE/USDT, Interval=5s");
-  console.log("  4. Watch the bot decisions and trades in real-time!\n");
+  console.log("  2. Go to Bots and start each one individually");
+  console.log("  3. Or run: npx tsx scripts/start-arena.ts");
+  console.log("     to auto-start all 3 bots for 1 hour via API\n");
 }
 
 main()
