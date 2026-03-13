@@ -75,6 +75,25 @@ export {
 } from "./schemas/api-key";
 
 export {
+  arenaStatus,
+  createArenaBody,
+  updateArenaStatusBody,
+  arenaEntrySchema,
+  arenaResponseSchema,
+  arenaListItemSchema,
+  arenaListQuery,
+  arenaListResponse,
+  type ArenaStatus,
+  type CreateArenaBody,
+  type UpdateArenaStatusBody,
+  type ArenaEntry,
+  type ArenaResponse,
+  type ArenaListItem,
+  type ArenaListQuery,
+  type ArenaListResponse,
+} from "./schemas/arena";
+
+export {
   runStatus,
   runInterval,
   runLogAction,

@@ -100,6 +100,7 @@ model User {
   refreshTokens RefreshToken[]
   bots          Bot[]
   apiKeys       ApiKey[]
+  arenas        Arena[]
 }
 
 model RefreshToken {
@@ -121,11 +122,12 @@ model Bot {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stats      BotStats?
-  gridConfig GridStrategyConfig?
-  logs       BotLog[]
-  runs       BotRun[]
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stats        BotStats?
+  gridConfig   GridStrategyConfig?
+  logs         BotLog[]
+  runs         BotRun[]
+  arenaEntries ArenaEntry[]
 
   @@index([userId])
 }
@@ -210,8 +212,9 @@ model BotRun {
   lossCount     Int   @default(0) @map("loss_count")
   roi           Float @default(0)
 
-  bot  Bot        @relation(fields: [botId], references: [id], onDelete: Cascade)
-  logs RunLog[]
+  bot        Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
+  logs       RunLog[]
+  arenaEntry ArenaEntry?
 
   @@index([botId, createdAt(sort: Desc)])
 }
@@ -227,6 +230,48 @@ model RunLog {
   run BotRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId, createdAt(sort: Desc)])
+}
+
+enum ArenaStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  STOPPED
+  ERROR
+}
+
+model Arena {
+  id            String      @id @default(cuid())
+  userId        String      @map("user_id")
+  name          String
+  exchange      ApiProvider
+  marketPair    String      @map("market_pair")
+  interval      RunInterval
+  durationHours Int         @default(1) @map("duration_hours")
+  status        ArenaStatus @default(PENDING)
+  startedAt     DateTime?   @map("started_at")
+  stoppedAt     DateTime?   @map("stopped_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries ArenaEntry[]
+
+  @@index([userId])
+}
+
+model ArenaEntry {
+  id       String  @id @default(cuid())
+  arenaId  String  @map("arena_id")
+  botId    String  @map("bot_id")
+  botRunId String  @unique @map("bot_run_id")
+  rank     Int?
+
+  arena  Arena  @relation(fields: [arenaId], references: [id], onDelete: Cascade)
+  bot    Bot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+  botRun BotRun @relation(fields: [botRunId], references: [id], onDelete: Cascade)
+
+  @@index([arenaId])
 }
 
 model ApiKey {

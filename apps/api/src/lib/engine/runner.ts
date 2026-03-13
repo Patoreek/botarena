@@ -20,6 +20,7 @@ import {
 } from "./grid.js";
 import { PaperTrader } from "./paper-trader.js";
 import { INTERVAL_MS, type RunInterval } from "@repo/shared";
+import { arenaManager } from "./arena-manager.js";
 
 export interface RunnerConfig {
   runId: string;
@@ -445,6 +446,8 @@ export class BotRunner {
           data: { status: "IDLE" },
         });
       }
+      // Notify arena manager if this run is part of an arena
+      await arenaManager.onRunComplete(this.config.runId);
     } catch (err) {
       this.log("error", `autoComplete error: ${err instanceof Error ? err.message : err}`);
     }

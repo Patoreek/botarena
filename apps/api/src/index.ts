@@ -11,6 +11,7 @@ import { wsRoutes } from "./routes/ws.js";
 import { botRoutes } from "./routes/bots.js";
 import { apiKeyRoutes } from "./routes/api-keys.js";
 import { runRoutes } from "./routes/runs.js";
+import { arenaRoutes } from "./routes/arenas.js";
 import { prisma } from "./lib/db.js";
 
 const PORT = parseInt(process.env.PORT ?? "4000", 10);
@@ -53,6 +54,15 @@ async function cleanupOrphanedRuns() {
     });
 
     console.log(`[startup] Cleaned up ${orphaned.length} orphaned run(s) and ${botIds.length} bot(s)`);
+
+    // Also mark any orphaned arenas as STOPPED
+    const orphanedArenas = await prisma.arena.updateMany({
+      where: { status: "RUNNING" },
+      data: { status: "STOPPED", stoppedAt: new Date() },
+    });
+    if (orphanedArenas.count > 0) {
+      console.log(`[startup] Cleaned up ${orphanedArenas.count} orphaned arena(s)`);
+    }
   } catch (err) {
     console.error("[startup] Failed to clean up orphaned runs:", err);
   }
@@ -97,6 +107,7 @@ async function main() {
   fastify.register(botRoutes, { prefix: "/" });
   fastify.register(apiKeyRoutes, { prefix: "/" });
   fastify.register(runRoutes, { prefix: "/" });
+  fastify.register(arenaRoutes, { prefix: "/" });
   await fastify.register(wsRoutes, { prefix: "/" });
 
   fastify.get("/health", async () => ({ ok: true }));

@@ -213,13 +213,15 @@ export function PerformanceChart({ points, loading }: PerformanceChartProps) {
                 color: "hsl(var(--foreground))",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               }}
-              formatter={(value: number, name: string) => {
-                if (name === "pnl") return [`${value >= 0 ? "+" : ""}${value.toFixed(4)} USDT`, "Cumulative PnL"];
-                if (name === "buyMarker") return ["BUY", "Trade"];
-                if (name === "sellMarker") return ["SELL", "Trade"];
+              formatter={(value: any, name: any) => {
+                const v = Number(value);
+                const n = String(name);
+                if (n === "pnl") return [`${v >= 0 ? "+" : ""}${v.toFixed(4)} USDT`, "Cumulative PnL"];
+                if (n === "buyMarker") return ["BUY", "Trade"];
+                if (n === "sellMarker") return ["SELL", "Trade"];
                 return [value, name];
               }}
-              labelFormatter={(label: string) => `Time: ${label}`}
+              labelFormatter={(label: any) => `Time: ${label}`}
             />
             <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" opacity={0.4} />
 
