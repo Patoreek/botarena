@@ -110,6 +110,58 @@ export function useRunLogs(botId: string, runId: string | null, params?: { page?
   return { logs, pagination, loading, refetch: fetch };
 }
 
+export interface ChartDataPoint {
+  time: string;
+  price: number;
+  pnl: number;
+  action: string;
+  portfolioValue?: number;
+}
+
+export interface ChartResponse {
+  points: ChartDataPoint[];
+  initialInvestment: number;
+  currentValue: number;
+}
+
+export function useChartData(botId: string, runId: string | null, pollInterval?: number) {
+  const { accessToken } = useAuth();
+  const [points, setPoints] = useState<ChartDataPoint[]>([]);
+  const [initialInvestment, setInitialInvestment] = useState(0);
+  const [currentValue, setCurrentValue] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    if (!accessToken || !runId) { setLoading(false); return; }
+    try {
+      const data = await apiFetch<ChartResponse>(
+        `/bots/${botId}/runs/${runId}/chart`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      setPoints(data.points);
+      setInitialInvestment(data.initialInvestment);
+      setCurrentValue(data.currentValue);
+    } catch {
+      // keep previous data on error
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken, botId, runId]);
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  // Auto-poll for active runs
+  useEffect(() => {
+    if (!pollInterval) return;
+    const id = setInterval(fetch, pollInterval);
+    return () => clearInterval(id);
+  }, [fetch, pollInterval]);
+
+  return { points, initialInvestment, currentValue, loading, refetch: fetch };
+}
+
 export function useAllRuns(params?: {
   page?: number;
   limit?: number;

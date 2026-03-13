@@ -28,11 +28,12 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { useBot, useBotLogs } from "@/hooks/use-bots";
-import { useRuns, useRun, useRunLogs } from "@/hooks/use-runs";
+import { useRuns, useRun, useRunLogs, useChartData } from "@/hooks/use-runs";
 import { useMarketData } from "@/hooks/use-market-data";
 import { INTERVAL_LABELS, INTERVAL_MS, DURATION_LABELS } from "@repo/shared";
 import type { RunResponse, RunInterval, Kline, TickMetadata, RunLogEntry } from "@repo/shared";
 
+import { PerformanceChart } from "@/components/performance-chart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,11 +63,13 @@ function OverviewTab({ bot }: { bot: any }) {
   } = useBotLogs(bot.id, { page: logsPage, limit: 10 });
 
   const stats = bot.stats;
+  const totalInvestment = bot.gridConfig?.totalInvestment ?? 0;
+  const currentValue = totalInvestment + (stats?.netPnl ?? 0);
 
   return (
     <div className="space-y-6">
       {stats && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Net PnL</CardTitle>
@@ -114,6 +117,26 @@ function OverviewTab({ bot }: { bot: any }) {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.maxDrawdown.toFixed(2)}%</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Investment</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalInvestment.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">USDT initial</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Current Value</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${currentValue >= totalInvestment ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                {currentValue.toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground">USDT now</p>
             </CardContent>
           </Card>
         </div>
@@ -404,6 +427,9 @@ function RunDetail({ botId, run, onBack, onStatusChange }: { botId: string; run:
   const { data: marketData, loading: marketLoading, error: marketError } = useMarketData(
     botId, run.id, runInterval, isRunActive
   );
+  const { points: chartPoints, initialInvestment, currentValue, loading: chartLoading } = useChartData(
+    botId, run.id, isRunActive ? (INTERVAL_MS[runInterval] ?? 10_000) : undefined
+  );
 
   const handleAction = async (status: string) => {
     if (!accessToken) return;
@@ -469,7 +495,7 @@ function RunDetail({ botId, run, onBack, onStatusChange }: { botId: string; run:
       </div>
 
       {/* Run stats */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Net PnL</CardTitle></CardHeader>
           <CardContent><div className="text-xl font-bold">{formatPnl(run.stats.netPnl)}</div></CardContent>
@@ -494,6 +520,22 @@ function RunDetail({ botId, run, onBack, onStatusChange }: { botId: string; run:
           <CardContent>
             <p className="text-xs text-emerald-600">+{run.stats.totalProfit.toFixed(2)}</p>
             <p className="text-xs text-red-600">-{run.stats.totalLoss.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Investment</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold">{initialInvestment.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">USDT initial</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Current Value</CardTitle></CardHeader>
+          <CardContent>
+            <div className={`text-xl font-bold ${currentValue >= initialInvestment ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+              {currentValue.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">USDT now</p>
           </CardContent>
         </Card>
       </div>
@@ -573,11 +615,31 @@ function RunDetail({ botId, run, onBack, onStatusChange }: { botId: string; run:
         </Card>
       )}
 
-      {/* Chart placeholder */}
+      {/* Performance Chart */}
       <Card>
-        <CardHeader><CardTitle>Performance Chart</CardTitle></CardHeader>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              Performance
+              {isRunActive && chartPoints.length > 0 && (
+                <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+              )}
+            </CardTitle>
+            {chartPoints.length > 0 && (
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-full bg-blue-500" /> Buy
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-full bg-amber-500" /> Sell
+                </span>
+                <span>{chartPoints.length} ticks</span>
+              </div>
+            )}
+          </div>
+        </CardHeader>
         <CardContent>
-          <div className="flex h-48 items-center justify-center rounded-lg border border-dashed text-muted-foreground">Charts coming soon</div>
+          <PerformanceChart points={chartPoints} loading={chartLoading} />
         </CardContent>
       </Card>
 
