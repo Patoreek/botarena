@@ -15,7 +15,7 @@ import type {
 
 const defaultPagination: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 0 };
 
-export function useRuns(botId: string, params?: { page?: number; limit?: number; status?: string }) {
+export function useRuns(botId: string, params?: { page?: number; limit?: number; status?: string; sort?: string }) {
   const { accessToken } = useAuth();
   const [runs, setRuns] = useState<RunResponse[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta>(defaultPagination);
@@ -29,6 +29,7 @@ export function useRuns(botId: string, params?: { page?: number; limit?: number;
       if (params?.page) qs.set("page", String(params.page));
       if (params?.limit) qs.set("limit", String(params.limit));
       if (params?.status) qs.set("status", params.status);
+      if (params?.sort) qs.set("sort", params.sort);
       const data = await apiFetch<RunListResponse>(
         `/bots/${botId}/runs?${qs.toString()}`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -40,7 +41,7 @@ export function useRuns(botId: string, params?: { page?: number; limit?: number;
     } finally {
       setLoading(false);
     }
-  }, [accessToken, botId, params?.page, params?.limit, params?.status]);
+  }, [accessToken, botId, params?.page, params?.limit, params?.status, params?.sort]);
 
   useEffect(() => {
     fetch();

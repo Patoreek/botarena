@@ -7,6 +7,23 @@ import { BotRunner, type RunnerConfig } from "./runner.js";
 
 class RunManager {
   private runners = new Map<string, BotRunner>();
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    // Periodically clean up completed runners from the map
+    this.cleanupTimer = setInterval(() => this.cleanup(), 10_000);
+  }
+
+  /**
+   * Remove finished runners from the map so they can be GC'd.
+   */
+  private cleanup(): void {
+    for (const [runId, runner] of this.runners) {
+      if (runner.isStopped) {
+        this.runners.delete(runId);
+      }
+    }
+  }
 
   /**
    * Start a new bot runner for the given run.

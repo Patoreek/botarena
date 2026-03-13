@@ -64,14 +64,17 @@ export async function runRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid query", details: parsed.error.flatten() });
       }
 
-      const { page, limit, status } = parsed.data;
+      const { page, limit, status, sort } = parsed.data;
       const where: Prisma.BotRunWhereInput = { botId };
       if (status) where.status = status;
+
+      const orderBy: Prisma.BotRunOrderByWithRelationInput =
+        sort === "netPnl" ? { netPnl: "desc" } : { createdAt: "desc" };
 
       const [items, total] = await Promise.all([
         prisma.botRun.findMany({
           where,
-          orderBy: { createdAt: "desc" },
+          orderBy,
           skip: (page - 1) * limit,
           take: limit,
         }),

@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   XCircle,
   MinusCircle,
+  Trophy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,63 @@ import { DeleteBotDialog } from "@/components/bots/delete-bot-dialog";
 import { StartRunDialog } from "@/components/bots/start-run-dialog";
 
 // ─── Overview Tab ────────────────────────────────────────────────────────────
+
+function TopRunsSection({ botId }: { botId: string }) {
+  const { runs, loading } = useRuns(botId, { page: 1, limit: 3, sort: "netPnl" });
+
+  const medals = ["text-amber-500", "text-zinc-400", "text-amber-700"];
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-4 w-4" /> Top Runs</CardTitle></CardHeader>
+        <CardContent><div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div></CardContent>
+      </Card>
+    );
+  }
+
+  if (runs.length === 0) {
+    return (
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-4 w-4" /> Top Runs</CardTitle></CardHeader>
+        <CardContent><p className="py-4 text-center text-sm text-muted-foreground">No runs yet</p></CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-4 w-4" /> Top Runs</CardTitle></CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {runs.map((run, i) => (
+            <div key={run.id} className="flex items-center gap-4 rounded-lg border p-3">
+              <span className={cn("text-lg font-bold", medals[i] ?? "text-muted-foreground")}>#{i + 1}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{run.exchange} &middot; {run.marketPair}</span>
+                  <RunStatusBadge status={run.status} />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {run.stats.totalTrades} trades &middot; {run.stats.winCount}W / {run.stats.lossCount}L &middot; ROI {run.stats.roi.toFixed(2)}%
+                </p>
+              </div>
+              <div className="text-right">
+                <div className={cn("text-lg font-bold", run.stats.netPnl > 0 ? "text-emerald-600 dark:text-emerald-400" : run.stats.netPnl < 0 ? "text-red-600 dark:text-red-400" : "")}>
+                  {run.stats.netPnl > 0 ? "+" : ""}{run.stats.netPnl.toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground">PnL</p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                <Link href={`/bots/${botId}?tab=runs&run=${run.id}`}><Eye className="h-4 w-4" /></Link>
+              </Button>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function OverviewTab({ bot }: { bot: any }) {
   const [logsPage, setLogsPage] = useState(1);
@@ -141,6 +199,8 @@ function OverviewTab({ bot }: { bot: any }) {
           </Card>
         </div>
       )}
+
+      <TopRunsSection botId={bot.id} />
 
       {bot.gridConfig && (
         <>

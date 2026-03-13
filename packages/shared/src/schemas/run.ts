@@ -204,6 +204,7 @@ export const runListQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   status: runStatus.optional(),
+  sort: z.enum(["createdAt", "netPnl"]).optional(),
 });
 export type RunListQuery = z.infer<typeof runListQuery>;
 
