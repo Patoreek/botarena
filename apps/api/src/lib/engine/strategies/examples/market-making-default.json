@@ -1,0 +1,16 @@
+{
+  "totalInvestment": 10000,
+  "orderSizePercent": 0.05,
+  "spreadPercent": 0.3,
+  "dynamicSpreadEnabled": true,
+  "dynamicSpreadAtrMultiplier": 1,
+  "maxInventory": 10,
+  "inventorySkewFactor": 0.5,
+  "refreshIntervalTicks": 1,
+  "maxVolatilityPause": 5,
+  "atrPeriod": 14,
+  "fairPriceSource": "EMA",
+  "emaPeriod": 20,
+  "adverseSelectionLookback": 5,
+  "adverseSelectionThreshold": 1
+}

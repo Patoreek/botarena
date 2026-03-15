@@ -60,6 +60,7 @@ function serializeBot(bot: any) {
           maxOpenOrders: bot.gridConfig.maxOpenOrders,
         }
       : null,
+    strategyConfig: bot.configJson ?? null,
   };
 }
 
@@ -122,42 +123,54 @@ export async function botRoutes(fastify: FastifyInstance) {
       if (!parsed.success) {
         return reply.status(400).send({ error: "Validation failed", details: parsed.error.flatten() });
       }
-      const { name, strategy, gridConfig } = parsed.data;
+      const { name, strategy, gridConfig, strategyConfig } = parsed.data as {
+        name: string;
+        strategy: string;
+        gridConfig?: any;
+        strategyConfig?: Record<string, unknown>;
+      };
 
-      const bot = await prisma.bot.create({
-        data: {
-          userId: req.user.id,
-          name,
-          strategy,
-          stats: { create: {} },
-          gridConfig: {
-            create: {
-              upperPrice: gridConfig.upperPrice,
-              lowerPrice: gridConfig.lowerPrice,
-              gridCount: gridConfig.gridCount,
-              gridType: gridConfig.gridType,
-              totalInvestment: gridConfig.totalInvestment,
-              amountPerGrid: gridConfig.amountPerGrid,
-              takeProfitPrice: gridConfig.takeProfitPrice ?? null,
-              stopLossPrice: gridConfig.stopLossPrice ?? null,
-              triggerPrice: gridConfig.triggerPrice ?? null,
-              gridMode: gridConfig.gridMode,
-              orderType: gridConfig.orderType,
-              trailingUp: gridConfig.trailingUp,
-              trailingDown: gridConfig.trailingDown,
-              stopLossAction: gridConfig.stopLossAction,
-              takeProfitAction: gridConfig.takeProfitAction,
-              minProfitPerGrid: gridConfig.minProfitPerGrid ?? null,
-              maxOpenOrders: gridConfig.maxOpenOrders ?? null,
-            },
-          },
-          logs: {
-            create: {
-              action: "CONFIG_CHANGE",
-              message: `Bot "${name}" created with ${strategy} strategy`,
-            },
+      const createData: any = {
+        userId: req.user.id,
+        name,
+        strategy,
+        stats: { create: {} },
+        logs: {
+          create: {
+            action: "CONFIG_CHANGE",
+            message: `Bot "${name}" created with ${strategy} strategy`,
           },
         },
+      };
+
+      if (strategy === "GRID" && gridConfig) {
+        createData.gridConfig = {
+          create: {
+            upperPrice: gridConfig.upperPrice,
+            lowerPrice: gridConfig.lowerPrice,
+            gridCount: gridConfig.gridCount,
+            gridType: gridConfig.gridType,
+            totalInvestment: gridConfig.totalInvestment,
+            amountPerGrid: gridConfig.amountPerGrid,
+            takeProfitPrice: gridConfig.takeProfitPrice ?? null,
+            stopLossPrice: gridConfig.stopLossPrice ?? null,
+            triggerPrice: gridConfig.triggerPrice ?? null,
+            gridMode: gridConfig.gridMode,
+            orderType: gridConfig.orderType,
+            trailingUp: gridConfig.trailingUp,
+            trailingDown: gridConfig.trailingDown,
+            stopLossAction: gridConfig.stopLossAction,
+            takeProfitAction: gridConfig.takeProfitAction,
+            minProfitPerGrid: gridConfig.minProfitPerGrid ?? null,
+            maxOpenOrders: gridConfig.maxOpenOrders ?? null,
+          },
+        };
+      } else if (strategyConfig) {
+        createData.configJson = strategyConfig;
+      }
+
+      const bot = await prisma.bot.create({
+        data: createData,
         include: { stats: true, gridConfig: true },
       });
 
@@ -205,7 +218,11 @@ export async function botRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Bot not found" });
       }
 
-      const { name, gridConfig } = parsed.data;
+      const { name, gridConfig, strategyConfig } = parsed.data as {
+        name?: string;
+        gridConfig?: any;
+        strategyConfig?: Record<string, unknown>;
+      };
 
       const botData: Prisma.BotUpdateInput = {};
       if (name !== undefined) botData.name = name;
@@ -232,6 +249,10 @@ export async function botRoutes(fastify: FastifyInstance) {
             ...(gridConfig.maxOpenOrders !== undefined && { maxOpenOrders: gridConfig.maxOpenOrders }),
           },
         };
+      }
+
+      if (strategyConfig) {
+        (botData as any).configJson = strategyConfig;
       }
 
       const bot = await prisma.bot.update({

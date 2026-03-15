@@ -9,6 +9,14 @@ datasource db {
 
 enum BotStrategy {
   GRID
+  TREND_FOLLOWING
+  MEAN_REVERSION
+  MARKET_MAKING
+  ARBITRAGE
+  DCA
+  SCALPING
+  REGIME
+  AI_SIGNAL
 }
 
 enum BotStatus {
@@ -126,6 +134,7 @@ model Bot {
   user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   stats        BotStats?
   gridConfig   GridStrategyConfig?
+  configJson   Json?               @map("config_json")
   logs         BotLog[]
   runs         BotRun[]
   arenaEntries ArenaEntry[]

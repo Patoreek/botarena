@@ -1,0 +1,28 @@
+{
+  "totalInvestment": 10000,
+  "adxPeriod": 14,
+  "atrPeriod": 14,
+  "bbPeriod": 20,
+  "trendThreshold": 25,
+  "volatilityThreshold": 3,
+  "rangingBandwidthThreshold": 0.02,
+  "minRegimeDurationTicks": 10,
+  "trendStrategy": "TREND_FOLLOWING",
+  "trendStrategyConfig": {
+    "fastPeriod": 9,
+    "slowPeriod": 21,
+    "adxThreshold": 20,
+    "positionSizePercent": 0.1,
+    "stopLossAtrMultiplier": 2,
+    "takeProfitAtrMultiplier": 3
+  },
+  "rangeStrategy": "MEAN_REVERSION",
+  "rangeStrategyConfig": {
+    "rsiOversold": 30,
+    "rsiOverbought": 70,
+    "bbStdDev": 2,
+    "positionSizePercent": 0.08,
+    "stopLossPercent": 3
+  },
+  "useWeightedScoring": false
+}

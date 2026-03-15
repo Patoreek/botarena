@@ -22,13 +22,17 @@ export default function EditBotPage() {
   const handleSubmit = async (data: BotFormData) => {
     if (!accessToken) return;
     try {
+      const body: Record<string, unknown> = { name: data.name };
+      if ("gridConfig" in data) {
+        body.gridConfig = data.gridConfig;
+      } else {
+        body.strategyConfig = data.strategyConfig;
+      }
+
       await apiFetch<BotResponse>(`/bots/${params.id}`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({
-          name: data.name,
-          gridConfig: data.gridConfig,
-        }),
+        body: JSON.stringify(body),
       });
       toast.success("Bot updated successfully");
       router.push(`/bots/${params.id}`);
@@ -58,6 +62,40 @@ export default function EditBotPage() {
     );
   }
 
+  const getDefaultValues = (): Partial<BotFormData & { strategyConfig?: Record<string, unknown> }> => {
+    if (bot.strategy === "GRID" && bot.gridConfig) {
+      return {
+        name: bot.name,
+        strategy: "GRID" as const,
+        gridConfig: {
+          upperPrice: bot.gridConfig.upperPrice,
+          lowerPrice: bot.gridConfig.lowerPrice,
+          gridCount: bot.gridConfig.gridCount,
+          gridType: bot.gridConfig.gridType as "ARITHMETIC" | "GEOMETRIC",
+          totalInvestment: bot.gridConfig.totalInvestment,
+          amountPerGrid: bot.gridConfig.amountPerGrid,
+          takeProfitPrice: bot.gridConfig.takeProfitPrice ?? undefined,
+          stopLossPrice: bot.gridConfig.stopLossPrice ?? undefined,
+          triggerPrice: bot.gridConfig.triggerPrice ?? undefined,
+          gridMode: bot.gridConfig.gridMode as "LONG" | "SHORT" | "NEUTRAL",
+          orderType: bot.gridConfig.orderType as "LIMIT" | "MARKET",
+          trailingUp: bot.gridConfig.trailingUp,
+          trailingDown: bot.gridConfig.trailingDown,
+          stopLossAction: bot.gridConfig.stopLossAction as "CLOSE_ALL" | "STOP_ONLY",
+          takeProfitAction: bot.gridConfig.takeProfitAction as "CLOSE_ALL" | "STOP_ONLY",
+          minProfitPerGrid: bot.gridConfig.minProfitPerGrid ?? undefined,
+          maxOpenOrders: bot.gridConfig.maxOpenOrders ?? undefined,
+        },
+      };
+    }
+
+    return {
+      name: bot.name,
+      strategy: bot.strategy as any,
+      strategyConfig: (bot as any).strategyConfig as Record<string, unknown> ?? {},
+    };
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center gap-4">
@@ -72,31 +110,7 @@ export default function EditBotPage() {
         </div>
       </div>
       <BotForm
-        defaultValues={{
-          name: bot.name,
-          strategy: bot.strategy as "GRID",
-          gridConfig: bot.gridConfig
-            ? {
-                upperPrice: bot.gridConfig.upperPrice,
-                lowerPrice: bot.gridConfig.lowerPrice,
-                gridCount: bot.gridConfig.gridCount,
-                gridType: bot.gridConfig.gridType as "ARITHMETIC" | "GEOMETRIC",
-                totalInvestment: bot.gridConfig.totalInvestment,
-                amountPerGrid: bot.gridConfig.amountPerGrid,
-                takeProfitPrice: bot.gridConfig.takeProfitPrice ?? undefined,
-                stopLossPrice: bot.gridConfig.stopLossPrice ?? undefined,
-                triggerPrice: bot.gridConfig.triggerPrice ?? undefined,
-                gridMode: bot.gridConfig.gridMode as "LONG" | "SHORT" | "NEUTRAL",
-                orderType: bot.gridConfig.orderType as "LIMIT" | "MARKET",
-                trailingUp: bot.gridConfig.trailingUp,
-                trailingDown: bot.gridConfig.trailingDown,
-                stopLossAction: bot.gridConfig.stopLossAction as "CLOSE_ALL" | "STOP_ONLY",
-                takeProfitAction: bot.gridConfig.takeProfitAction as "CLOSE_ALL" | "STOP_ONLY",
-                minProfitPerGrid: bot.gridConfig.minProfitPerGrid ?? undefined,
-                maxOpenOrders: bot.gridConfig.maxOpenOrders ?? undefined,
-              }
-            : undefined,
-        }}
+        defaultValues={getDefaultValues()}
         onSubmit={handleSubmit}
         submitLabel="Save Changes"
       />

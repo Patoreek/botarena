@@ -1,0 +1,22 @@
+{
+  "totalInvestment": 10000,
+  "positionSizePercent": 0.05,
+  "rsiPeriod": 14,
+  "rsiOversold": 20,
+  "rsiOverbought": 80,
+  "bbPeriod": 20,
+  "bbStdDev": 2.5,
+  "zScorePeriod": 20,
+  "zScoreEntryThreshold": 2.5,
+  "zScoreExitThreshold": 0.5,
+  "useVwapDeviation": false,
+  "trendFilterPeriod": 50,
+  "trendFilterEnabled": true,
+  "exitMode": "MEAN_REVERSION",
+  "fixedTargetPercent": 1,
+  "maxPositions": 2,
+  "cooldownTicks": 5,
+  "stopLossPercent": 2,
+  "enableLong": true,
+  "enableShort": false
+}

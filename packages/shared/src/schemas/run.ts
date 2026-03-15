@@ -215,7 +215,7 @@ export const allRunsListQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(10),
   status: runStatus.optional(),
   search: z.string().optional(),
-  strategy: z.enum(["GRID"]).optional(),
+  strategy: z.enum(["GRID", "TREND_FOLLOWING", "MEAN_REVERSION", "MARKET_MAKING", "ARBITRAGE", "DCA", "SCALPING", "REGIME", "AI_SIGNAL"]).optional(),
   exchange: apiProvider.optional(),
 });
 export type AllRunsListQuery = z.infer<typeof allRunsListQuery>;

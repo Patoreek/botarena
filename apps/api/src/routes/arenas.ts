@@ -12,6 +12,7 @@ import type { Prisma } from "@prisma/client";
 import { runManager } from "../lib/engine/manager.js";
 import { arenaManager } from "../lib/engine/arena-manager.js";
 import type { GridConfig } from "../lib/engine/grid.js";
+import type { Prisma as PrismaTypes } from "@prisma/client";
 
 function serializeDate(d: Date): string {
   return d.toISOString();
@@ -84,7 +85,7 @@ export async function arenaRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: `No ${exchange} API key configured. Add one in Settings > Integrations.` });
       }
 
-      // Verify all bots belong to user and have grid configs
+      // Verify all bots belong to user and have configs
       const bots = await prisma.bot.findMany({
         where: { id: { in: botIds }, userId: req.user.id },
         include: { gridConfig: true },
@@ -94,10 +95,10 @@ export async function arenaRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: "One or more bots not found" });
       }
 
-      const botsWithoutConfig = bots.filter((b) => !b.gridConfig);
+      const botsWithoutConfig = bots.filter((b) => b.strategy === "GRID" ? !b.gridConfig : !(b as any).configJson);
       if (botsWithoutConfig.length > 0) {
         return reply.status(400).send({
-          error: `Bots missing grid config: ${botsWithoutConfig.map((b) => b.name).join(", ")}`,
+          error: `Bots missing config: ${botsWithoutConfig.map((b) => b.name).join(", ")}`,
         });
       }
 
@@ -148,26 +149,32 @@ export async function arenaRoutes(fastify: FastifyInstance) {
           },
         });
 
-        // Start the engine
-        const gridConfig = bot.gridConfig!;
-        const engineConfig: GridConfig = {
-          upperPrice: gridConfig.upperPrice,
-          lowerPrice: gridConfig.lowerPrice,
-          gridCount: gridConfig.gridCount,
-          gridType: gridConfig.gridType as "ARITHMETIC" | "GEOMETRIC",
-          gridMode: gridConfig.gridMode as "LONG" | "SHORT" | "NEUTRAL",
-          amountPerGrid: gridConfig.amountPerGrid,
-          totalInvestment: gridConfig.totalInvestment,
-          minProfitPerGrid: gridConfig.minProfitPerGrid ?? undefined,
-          maxOpenOrders: gridConfig.maxOpenOrders ?? undefined,
-        };
+        // Start the engine — build config based on strategy type
+        let strategyConfig: unknown;
+        if (bot.strategy === "GRID") {
+          const gc = bot.gridConfig!;
+          strategyConfig = {
+            upperPrice: gc.upperPrice,
+            lowerPrice: gc.lowerPrice,
+            gridCount: gc.gridCount,
+            gridType: gc.gridType as "ARITHMETIC" | "GEOMETRIC",
+            gridMode: gc.gridMode as "LONG" | "SHORT" | "NEUTRAL",
+            amountPerGrid: gc.amountPerGrid,
+            totalInvestment: gc.totalInvestment,
+            minProfitPerGrid: gc.minProfitPerGrid ?? undefined,
+            maxOpenOrders: gc.maxOpenOrders ?? undefined,
+          };
+        } else {
+          strategyConfig = (bot as any).configJson ?? {};
+        }
 
         runManager.start({
           runId: run.id,
           botId: bot.id,
           marketPair,
           interval: interval as RunInterval,
-          gridConfig: engineConfig,
+          strategySlug: bot.strategy,
+          strategyConfig,
           durationMs: durationHours * 60 * 60 * 1000,
         });
 

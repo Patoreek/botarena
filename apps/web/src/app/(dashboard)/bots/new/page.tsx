@@ -18,10 +18,20 @@ export default function NewBotPage() {
   const handleSubmit = async (data: BotFormData) => {
     if (!accessToken) return;
     try {
+      const payload: Record<string, unknown> = {
+        name: data.name,
+        strategy: data.strategy,
+      };
+      if ("gridConfig" in data) {
+        payload.gridConfig = data.gridConfig;
+      } else {
+        payload.strategyConfig = data.strategyConfig;
+      }
+
       const bot = await apiFetch<BotResponse>("/bots", {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       toast.success("Bot created successfully");
       router.push(`/bots/${bot.id}`);

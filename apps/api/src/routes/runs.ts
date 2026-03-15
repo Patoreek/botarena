@@ -137,28 +137,39 @@ export async function runRoutes(fastify: FastifyInstance) {
         data: { status: "RUNNING" },
       });
 
-      // Start the bot engine if bot has a grid config
-      const gridConfig = await prisma.gridStrategyConfig.findUnique({
-        where: { botId },
-      });
-      if (gridConfig) {
-        const engineConfig: GridConfig = {
-          upperPrice: gridConfig.upperPrice,
-          lowerPrice: gridConfig.lowerPrice,
-          gridCount: gridConfig.gridCount,
-          gridType: gridConfig.gridType as "ARITHMETIC" | "GEOMETRIC",
-          gridMode: gridConfig.gridMode as "LONG" | "SHORT" | "NEUTRAL",
-          amountPerGrid: gridConfig.amountPerGrid,
-          totalInvestment: gridConfig.totalInvestment,
-          minProfitPerGrid: gridConfig.minProfitPerGrid ?? undefined,
-          maxOpenOrders: gridConfig.maxOpenOrders ?? undefined,
-        };
+      // Load strategy config and start the engine
+      let strategyConfig: unknown = null;
+
+      if (bot.strategy === "GRID") {
+        const gridConfig = await prisma.gridStrategyConfig.findUnique({
+          where: { botId },
+        });
+        if (gridConfig) {
+          strategyConfig = {
+            upperPrice: gridConfig.upperPrice,
+            lowerPrice: gridConfig.lowerPrice,
+            gridCount: gridConfig.gridCount,
+            gridType: gridConfig.gridType as "ARITHMETIC" | "GEOMETRIC",
+            gridMode: gridConfig.gridMode as "LONG" | "SHORT" | "NEUTRAL",
+            amountPerGrid: gridConfig.amountPerGrid,
+            totalInvestment: gridConfig.totalInvestment,
+            minProfitPerGrid: gridConfig.minProfitPerGrid ?? undefined,
+            maxOpenOrders: gridConfig.maxOpenOrders ?? undefined,
+          };
+        }
+      } else {
+        // Non-grid strategies store config in bot.configJson
+        strategyConfig = (bot as any).configJson;
+      }
+
+      if (strategyConfig) {
         runManager.start({
           runId: run.id,
           botId,
           marketPair: run.marketPair,
           interval: interval as RunInterval,
-          gridConfig: engineConfig,
+          strategySlug: bot.strategy,
+          strategyConfig,
           durationMs: (durationHours ?? 1) * 60 * 60 * 1000,
         });
       }

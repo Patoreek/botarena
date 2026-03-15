@@ -1,0 +1,23 @@
+{
+  "totalInvestment": 10000,
+  "positionSizePercent": 0.15,
+  "fastPeriod": 7,
+  "slowPeriod": 14,
+  "adxPeriod": 14,
+  "adxThreshold": 20,
+  "useMacdConfirmation": true,
+  "macdFast": 12,
+  "macdSlow": 26,
+  "macdSignal": 9,
+  "atrPeriod": 14,
+  "stopLossAtrMultiplier": 1.5,
+  "takeProfitAtrMultiplier": 3,
+  "cooldownTicks": 3,
+  "maxPositions": 5,
+  "enablePyramiding": true,
+  "pyramidMaxEntries": 3,
+  "pullbackEntryEnabled": false,
+  "pullbackThresholdPercent": 0.5,
+  "enableLong": true,
+  "enableShort": false
+}

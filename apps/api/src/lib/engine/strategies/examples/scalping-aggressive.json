@@ -1,0 +1,19 @@
+{
+  "totalInvestment": 5000,
+  "positionSizePercent": 0.2,
+  "emaPeriod": 3,
+  "atrPeriod": 7,
+  "rsiPeriod": 5,
+  "stopAtrMultiplier": 0.8,
+  "tpAtrMultiplier": 1.2,
+  "maxHoldTicks": 15,
+  "cooldownTicks": 2,
+  "maxTradesPerSession": 100,
+  "volumeSpikeThreshold": 1.3,
+  "momentumThreshold": 0.03,
+  "rsiMaxForBuy": 75,
+  "rsiMinForSell": 25,
+  "feeRate": 0.001,
+  "enableLong": true,
+  "enableShort": false
+}

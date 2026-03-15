@@ -1,6 +1,16 @@
 import { z } from "zod";
 
-export const botStrategy = z.enum(["GRID"]);
+export const botStrategy = z.enum([
+  "GRID",
+  "TREND_FOLLOWING",
+  "MEAN_REVERSION",
+  "MARKET_MAKING",
+  "ARBITRAGE",
+  "DCA",
+  "SCALPING",
+  "REGIME",
+  "AI_SIGNAL",
+]);
 export type BotStrategy = z.infer<typeof botStrategy>;
 
 export const botStatus = z.enum(["IDLE", "RUNNING", "STOPPED", "ERROR"]);
@@ -58,18 +68,34 @@ export const createBotBody = z
   .object({
     name: z.string().min(1).max(100),
     strategy: botStrategy,
-    gridConfig: gridStrategyConfigSchema,
+    gridConfig: gridStrategyConfigSchema.optional(),
+    /** JSON config for non-grid strategies — validated per-strategy at the API layer */
+    strategyConfig: z.record(z.unknown()).optional(),
   })
-  .refine((d) => d.gridConfig.upperPrice > d.gridConfig.lowerPrice, {
-    message: "Upper price must be greater than lower price",
-    path: ["gridConfig", "upperPrice"],
-  });
+  .refine(
+    (d) => {
+      if (d.strategy === "GRID") {
+        if (!d.gridConfig) return false;
+        return d.gridConfig.upperPrice > d.gridConfig.lowerPrice;
+      }
+      return true;
+    },
+    { message: "Grid bots require gridConfig with upperPrice > lowerPrice", path: ["gridConfig"] }
+  )
+  .refine(
+    (d) => {
+      if (d.strategy !== "GRID" && !d.strategyConfig) return false;
+      return true;
+    },
+    { message: "Non-grid strategies require strategyConfig", path: ["strategyConfig"] }
+  );
 export type CreateBotBody = z.infer<typeof createBotBody>;
 
 export const updateBotBody = z
   .object({
     name: z.string().min(1).max(100).optional(),
     gridConfig: gridStrategyConfigSchema.partial().optional(),
+    strategyConfig: z.record(z.unknown()).optional(),
   })
   .refine(
     (d) => {
@@ -136,6 +162,7 @@ export const botResponseSchema = z.object({
   updatedAt: z.string(),
   stats: botStatsSchema.nullable(),
   gridConfig: gridConfigResponseSchema.nullable(),
+  strategyConfig: z.unknown().nullable(),
 });
 export type BotResponse = z.infer<typeof botResponseSchema>;
 

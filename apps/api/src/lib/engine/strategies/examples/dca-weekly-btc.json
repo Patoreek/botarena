@@ -1,0 +1,16 @@
+{
+  "totalInvestment": 5000,
+  "buyAmountQuote": 50,
+  "buyIntervalTicks": 120,
+  "valueAveragingEnabled": false,
+  "dipBuyEnabled": true,
+  "dipThresholdPercent": 5,
+  "dipMultiplier": 2,
+  "maxBudget": 5000,
+  "takeProfitPercent": 20,
+  "safetyOrderEnabled": true,
+  "safetyOrderStepPercent": 3,
+  "safetyOrderMaxCount": 3,
+  "safetyOrderMultiplier": 1.5,
+  "dynamicSizingEnabled": false
+}
