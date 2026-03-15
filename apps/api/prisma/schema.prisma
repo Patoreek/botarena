@@ -119,6 +119,7 @@ model Bot {
   name        String
   strategy    BotStrategy
   status      BotStatus   @default(IDLE)
+  archivedAt  DateTime?   @map("archived_at")
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 

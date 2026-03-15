@@ -17,6 +17,7 @@ interface UseBotListParams {
   limit?: number;
   search?: string;
   status?: string;
+  archived?: string;
   sortBy?: string;
   sortOrder?: string;
 }
@@ -46,6 +47,7 @@ export function useBots(params: UseBotListParams = {}) {
       if (p.limit) query.set("limit", String(p.limit));
       if (p.search) query.set("search", p.search);
       if (p.status) query.set("status", p.status);
+      if (p.archived) query.set("archived", p.archived);
       if (p.sortBy) query.set("sortBy", p.sortBy);
       if (p.sortOrder) query.set("sortOrder", p.sortOrder);
 

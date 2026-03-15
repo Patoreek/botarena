@@ -20,6 +20,7 @@ function serializeBot(bot: any) {
     name: bot.name,
     strategy: bot.strategy,
     status: bot.status,
+    archivedAt: bot.archivedAt ? serializeDate(bot.archivedAt) : null,
     createdAt: serializeDate(bot.createdAt),
     updatedAt: serializeDate(bot.updatedAt),
     stats: bot.stats
@@ -73,9 +74,14 @@ export async function botRoutes(fastify: FastifyInstance) {
       if (!parsed.success) {
         return reply.status(400).send({ error: "Invalid query", details: parsed.error.flatten() });
       }
-      const { page, limit, search, status, sortBy, sortOrder } = parsed.data;
+      const { page, limit, search, status, sortBy, sortOrder, archived } = parsed.data;
 
       const where: Prisma.BotWhereInput = { userId: req.user.id };
+      if (archived) {
+        where.archivedAt = { not: null };
+      } else {
+        where.archivedAt = null;
+      }
       if (search) {
         where.name = { contains: search, mode: "insensitive" };
       }
@@ -275,6 +281,72 @@ export async function botRoutes(fastify: FastifyInstance) {
           botId: bot.id,
           action: status === "RUNNING" ? "BOT_START" : "BOT_STOP",
           message: status === "RUNNING" ? "Bot started" : "Bot stopped",
+        },
+      });
+
+      return serializeBot(bot);
+    }
+  );
+
+  // PATCH /bots/:id/archive - archive bot
+  fastify.patch(
+    "/bots/:id/archive",
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const req = request as AuthenticatedRequest;
+      const { id } = request.params as { id: string };
+      const existing = await prisma.bot.findUnique({ where: { id } });
+      if (!existing || existing.userId !== req.user.id) {
+        return reply.status(404).send({ error: "Bot not found" });
+      }
+      if (existing.archivedAt) {
+        return reply.status(400).send({ error: "Bot is already archived" });
+      }
+
+      const bot = await prisma.bot.update({
+        where: { id },
+        data: { archivedAt: new Date(), status: "STOPPED" },
+        include: { stats: true, gridConfig: true },
+      });
+
+      await prisma.botLog.create({
+        data: {
+          botId: bot.id,
+          action: "MANUAL",
+          message: "Bot archived",
+        },
+      });
+
+      return serializeBot(bot);
+    }
+  );
+
+  // PATCH /bots/:id/restore - restore archived bot
+  fastify.patch(
+    "/bots/:id/restore",
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const req = request as AuthenticatedRequest;
+      const { id } = request.params as { id: string };
+      const existing = await prisma.bot.findUnique({ where: { id } });
+      if (!existing || existing.userId !== req.user.id) {
+        return reply.status(404).send({ error: "Bot not found" });
+      }
+      if (!existing.archivedAt) {
+        return reply.status(400).send({ error: "Bot is not archived" });
+      }
+
+      const bot = await prisma.bot.update({
+        where: { id },
+        data: { archivedAt: null, status: "IDLE" },
+        include: { stats: true, gridConfig: true },
+      });
+
+      await prisma.botLog.create({
+        data: {
+          botId: bot.id,
+          action: "MANUAL",
+          message: "Bot restored from archive",
         },
       });
 

@@ -131,6 +131,7 @@ export const botResponseSchema = z.object({
   name: z.string(),
   strategy: botStrategy,
   status: botStatus,
+  archivedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
   stats: botStatsSchema.nullable(),
@@ -143,6 +144,7 @@ export const botListItemSchema = z.object({
   name: z.string(),
   strategy: botStrategy,
   status: botStatus,
+  archivedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
   stats: botStatsSchema.nullable(),
@@ -170,6 +172,10 @@ export const botListQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(10),
   search: z.string().optional(),
   status: botStatus.optional(),
+  archived: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   sortBy: z.enum(["name", "createdAt", "updatedAt", "status"]).default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });

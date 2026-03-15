@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Eye, Pencil, Trash2, Bot } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Bot, Archive, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/lib/auth-context";
@@ -42,12 +42,25 @@ export default function BotsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [deleteTarget, setDeleteTarget] = useState<BotListItem | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivePage, setArchivePage] = useState(1);
 
   const { bots, pagination, loading, refetch } = useBots({
     page,
     limit,
     search: search || undefined,
     status: statusFilter || undefined,
+  });
+
+  const {
+    bots: archivedBots,
+    pagination: archivedPagination,
+    loading: archivedLoading,
+    refetch: refetchArchived,
+  } = useBots({
+    page: archivePage,
+    limit: 10,
+    archived: "true",
   });
 
   const handleDelete = async () => {
@@ -59,8 +72,39 @@ export default function BotsPage() {
       });
       toast.success(`"${deleteTarget.name}" deleted`);
       refetch();
+      refetchArchived();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed");
+    }
+  };
+
+  const handleArchive = async (bot: BotListItem) => {
+    if (!accessToken) return;
+    try {
+      await apiFetch(`/bots/${bot.id}/archive`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      toast.success(`"${bot.name}" archived`);
+      refetch();
+      refetchArchived();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Archive failed");
+    }
+  };
+
+  const handleRestore = async (bot: BotListItem) => {
+    if (!accessToken) return;
+    try {
+      await apiFetch(`/bots/${bot.id}/restore`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      toast.success(`"${bot.name}" restored`);
+      refetch();
+      refetchArchived();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Restore failed");
     }
   };
 
@@ -212,6 +256,15 @@ export default function BotsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-8 w-8 text-amber-600 hover:text-amber-600"
+                          onClick={() => handleArchive(bot)}
+                          title="Archive bot"
+                        >
+                          <Archive className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={() => setDeleteTarget(bot)}
                         >
@@ -254,6 +307,14 @@ export default function BotsPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="text-amber-600 hover:text-amber-600"
+                    onClick={() => handleArchive(bot)}
+                  >
+                    <Archive className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="text-destructive hover:text-destructive"
                     onClick={() => setDeleteTarget(bot)}
                   >
@@ -271,6 +332,144 @@ export default function BotsPage() {
           />
         </>
       )}
+
+      {/* Archived Bots Section */}
+      <div className="border-t pt-6">
+        <button
+          className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          onClick={() => setShowArchived(!showArchived)}
+        >
+          {showArchived ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          <Archive className="h-4 w-4" />
+          Archived Bots
+          {archivedPagination.total > 0 && (
+            <Badge variant="secondary" className="ml-1">{archivedPagination.total}</Badge>
+          )}
+        </button>
+
+        {showArchived && (
+          <div className="mt-4 space-y-3">
+            {archivedLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : archivedBots.length === 0 ? (
+              <div className="rounded-lg border border-dashed py-8 text-center">
+                <Archive className="mx-auto h-8 w-8 text-muted-foreground" />
+                <p className="mt-2 text-sm text-muted-foreground">No archived bots</p>
+              </div>
+            ) : (
+              <>
+                {/* Desktop table */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Strategy</TableHead>
+                        <TableHead className="text-right">Net PnL</TableHead>
+                        <TableHead className="text-right">Archived</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {archivedBots.map((bot) => (
+                        <TableRow key={bot.id} className="opacity-70">
+                          <TableCell className="font-medium">{bot.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{bot.strategy}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {bot.stats ? formatPnl(bot.stats.netPnl) : "—"}
+                          </TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">
+                            {bot.archivedAt
+                              ? new Date(bot.archivedAt).toLocaleDateString()
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => router.push(`/bots/${bot.id}`)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-emerald-600 hover:text-emerald-600"
+                                onClick={() => handleRestore(bot)}
+                                title="Restore bot"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => setDeleteTarget(bot)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile cards */}
+                <div className="space-y-3 md:hidden">
+                  {archivedBots.map((bot) => (
+                    <div key={bot.id} className="rounded-lg border p-4 space-y-3 opacity-70">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{bot.name}</span>
+                        <Badge variant="secondary">Archived</Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>PnL: {bot.stats ? formatPnl(bot.stats.netPnl) : "—"}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-emerald-600"
+                          onClick={() => handleRestore(bot)}
+                        >
+                          <RotateCcw className="mr-1 h-4 w-4" />
+                          Restore
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(bot)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {archivedPagination.totalPages > 1 && (
+                  <Pagination
+                    page={archivedPagination.page}
+                    totalPages={archivedPagination.totalPages}
+                    onPageChange={setArchivePage}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Delete Dialog */}
       <DeleteBotDialog
