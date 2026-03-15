@@ -7,7 +7,7 @@
  *   npx tsx scripts/start-arena.ts
  */
 
-const API_BASE = process.env.API_URL ?? "http://localhost:5001";
+const API_BASE = process.env.API_URL ?? "http://localhost:3001";
 const EMAIL = process.env.TEST_EMAIL ?? "testing@gmail.com";
 const PASSWORD = process.env.TEST_PASSWORD ?? "Testing123!";
 

@@ -64,17 +64,14 @@ export async function runRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid query", details: parsed.error.flatten() });
       }
 
-      const { page, limit, status, sort } = parsed.data;
+      const { page, limit, status } = parsed.data;
       const where: Prisma.BotRunWhereInput = { botId };
       if (status) where.status = status;
-
-      const orderBy: Prisma.BotRunOrderByWithRelationInput =
-        sort === "netPnl" ? { netPnl: "desc" } : { createdAt: "desc" };
 
       const [items, total] = await Promise.all([
         prisma.botRun.findMany({
           where,
-          orderBy,
+          orderBy: { createdAt: "desc" },
           skip: (page - 1) * limit,
           take: limit,
         }),
@@ -375,97 +372,6 @@ export async function runRoutes(fastify: FastifyInstance) {
         })),
         pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
       };
-    }
-  );
-
-  // GET /bots/:botId/runs/:runId/chart - PnL chart data (all ticks + trades)
-  fastify.get(
-    "/bots/:botId/runs/:runId/chart",
-    { preHandler: [fastify.authenticate] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const req = request as AuthenticatedRequest;
-      const { botId, runId } = request.params as { botId: string; runId: string };
-
-      const bot = await prisma.bot.findUnique({ where: { id: botId } });
-      if (!bot || bot.userId !== req.user.id) {
-        return reply.status(404).send({ error: "Bot not found" });
-      }
-
-      const run = await prisma.botRun.findUnique({ where: { id: runId } });
-      if (!run || run.botId !== botId) {
-        return reply.status(404).send({ error: "Run not found" });
-      }
-
-      // Fetch all TICK, TRADE_BUY, and TRADE_SELL logs ordered by time
-      const logs = await prisma.runLog.findMany({
-        where: {
-          runId,
-          action: { in: ["TICK", "TRADE_BUY", "TRADE_SELL"] },
-        },
-        orderBy: { createdAt: "asc" },
-        select: {
-          action: true,
-          metadata: true,
-          createdAt: true,
-        },
-      });
-
-      // Build chart data points with cumulative PnL
-      let cumulativePnl = 0;
-      let totalValue = run.totalProfit !== undefined ? 0 : 0;
-      const points: Array<{
-        time: string;
-        price: number;
-        pnl: number;
-        action: string;
-        portfolioValue?: number;
-      }> = [];
-
-      for (const log of logs) {
-        const meta = log.metadata as Record<string, any> | null;
-        if (!meta) continue;
-
-        const price = meta.price ?? 0;
-
-        if (log.action === "TRADE_SELL" && meta.pnl !== undefined) {
-          cumulativePnl += meta.pnl;
-        }
-
-        // Parse portfolio value from position string like "80.0000 base + 292.31 USDT = 299.90 USDT total (..."
-        let portfolioValue: number | undefined;
-        if (meta.position) {
-          const match = String(meta.position).match(/=\s*([\d.]+)\s*USDT\s*total/);
-          if (match) portfolioValue = parseFloat(match[1]);
-        }
-
-        // For trades, also get portfolio value from balances
-        if ((log.action === "TRADE_BUY" || log.action === "TRADE_SELL") && meta.quoteBalance !== undefined && meta.baseBalance !== undefined) {
-          portfolioValue = meta.quoteBalance + meta.baseBalance * price;
-        }
-
-        points.push({
-          time: serializeDate(log.createdAt),
-          price,
-          pnl: cumulativePnl,
-          action: log.action,
-          portfolioValue,
-        });
-      }
-
-      // Get initial investment from grid config
-      const gridConfig = await prisma.gridStrategyConfig.findUnique({ where: { botId } });
-      const initialInvestment = gridConfig?.totalInvestment ?? 0;
-
-      // Derive current value from the last point's portfolio value or from latest trade
-      let currentValue = initialInvestment;
-      for (let i = points.length - 1; i >= 0; i--) {
-        if (points[i].portfolioValue !== undefined) {
-          currentValue = points[i].portfolioValue!;
-          break;
-        }
-      }
-
-      return { points, initialInvestment, currentValue };
     }
   );
 
